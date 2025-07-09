@@ -1,0 +1,572 @@
+////////////////////////////////////////////////////////////////////
+// Name:        IK - FK Matcher ( For Autodesk Maya )             //
+// Written by:  Khaled Hussein (KhaledGraphic@msn.com)            //
+// Version:     2.33                                              //
+//----------------------------------------------------------------//
+// Gumroad:     https://khaledhussein.gumroad.com                 //
+// Facebook:    www.facebook.com/khaled.graphic                   //
+// Youtube:     www.youtube.com/channel/UCZ1sYFZKE8bdHR7lMPhzTMQ  //
+// Vimeo:       https://vimeo.com/user71502391                    //
+////////////////////////////////////////////////////////////////////
+
+if (`window -exists IK_FK_Quick_Match`)
+{
+   deleteUI IK_FK_Quick_Match;
+}
+
+window -dockStation -rtf on -minimizeButton off -maximizeButton off  -t "IK - FK Match " -s off -wh 200 100  IK_FK_Quick_Match;
+columnLayout -rowSpacing 5 -adj true;
+text -font "boldLabelFont" -l "IK-FK Quick Match";
+text -h 20 -l "Select any 'FK Ctrl' or 'IK Ctrl'";
+checkBox -label "Match PoleVector to FK Elbow" PoleVector_to_FkElbow_quick_CHB;
+checkBox -label "Auto Switch " -ann "Auto switch from (IK to FK) or (FK to IK)" -v on AutoSwitch_quick_CHB; 
+
+optionMenu -l "Match Method " -highlightColor .4 .6 .15 -cc "global int $MatchMethod_Selected; $MatchMethod_Selected= `optionMenu -q -select MatchMethod_Menu`;" MatchMethod_Menu;
+    menuItem -l "Constrain";
+    menuItem -l "Match Transforms";
+
+separator -style "in" -bgc .4 .5 .2;
+
+rowLayout -numberOfColumns 3
+    -columnWidth3 105 5 100
+    -adjustableColumn 3
+    -columnAlign  1 "left"
+    -columnAttach 1 "both" 0
+    -columnAttach 2 "both" 2
+    -columnAttach 3 "both" 0;
+    button -l "IK to FK" -c "IK_to_FK_Quick()" -annotation "Transfer IK to FK, Use this function in IK mode";
+    text -l "" ;
+    button -l "FK to IK" -c "FK_to_IK_Quick()" -annotation "Transfer FK to IK, Use this function in FK mode";
+    setParent ..;
+
+separator -style "in" -bgc .4 .5 .2;
+textField -text "IK-FK Match                      | Version: 2.33.0" -editable off -h 21 -bgc .15 .15 .15 ;
+
+showWindow IK_FK_Quick_Match;
+//======================================================================================================================================
+
+
+
+global string $Switch_Ctrl_name;
+global string $ShoulderJoint_quick ;
+global string $ElbowJoint_quick ;
+global string $WristJoint_quick ;
+global string $FK_Shoulder_Ctrl_quick ;
+global string $FK_Elbow_Ctrl_quick ;
+global string $FK_Wrist_Ctrl_quick ;
+global string $PoleVector_Ctrl_quick ;
+global string $IK_Wrist_Ctrl_quick ;
+global string $Switch_attr_quick ;
+global float $IK__value_quick ;
+global float $FK__value_quick ;
+
+// Set latest option in Match Method:
+global int $MatchMethod_Selected ;
+if($MatchMethod_Selected > 0) optionMenu -e -select $MatchMethod_Selected MatchMethod_Menu;
+
+// Namespace Replace End:============================================================================================
+global proc string NameSpace_ReplaceEnd(string $name_space, string $lastName)
+{
+    string $spliters[];
+    tokenize  $name_space ":" $spliters; // Remove namespace:
+    int $index_no = size($spliters)-1;
+    //print $index_no;
+    stringArrayRemoveAtIndex($index_no, $spliters);
+    $spliters[size($spliters)] = $lastName;
+    $name_space = stringArrayToString($spliters, ":");
+    //print $name_space;
+    return $name_space;
+}// End Namespace Replace End:=======================================================================================
+
+// Scan for old data ====================================================================================================================
+string $All_IK_FKtransform[] = `ls -type "transform" "*:IK_TO_FK_Limbs*" "IK_TO_FK_Limbs"`;
+if(size($All_IK_FKtransform) > 0)
+{
+    for($item in $All_IK_FKtransform)
+    {
+        string $Chains[] = `listRelatives -c $item`;
+        for($Chain in $Chains)
+        {
+            /////////////////////////////////////////////////////////////////////////
+            string $Limb_data[] = `listAttr -userDefined $Chain`;
+            for($limbo in $Limb_data)
+            {
+                string $St_data = `getAttr ($Chain + "." + $limbo)`;
+                if(!`objExists $St_data`)
+                {
+                    //print $Limb_data;
+                    if($limbo == "IK_Value" || $limbo == "FK_Value")
+                    {
+                        //print $attr;
+                    }else{
+                        $ShoulderJoint_quick = `getAttr ($Chain + "." + $limbo)`;
+                        //print ("old name: " + $ShoulderJoint_quick + "\n");
+                        $ShoulderJoint_quick = NameSpace_ReplaceEnd($Chain, $ShoulderJoint_quick);
+                        //print ("New name: " + $ShoulderJoint_quick + "\n");
+                        setAttr -type "string" ($Chain + "." + $limbo) $ShoulderJoint_quick;
+                    }
+
+                }
+            }
+        }/////////////////////////////////////////////////////////////////////////////
+        
+    }
+    inViewMessage 
+		-smg ("<font color=\"#9CFF33\">" +  " (IK - FK) Data Received " ) 
+		-pos topCenter -bkc 0x00000000  
+		-fade  
+		-fadeOutTime 200 
+		-fadeStayTime 3000  
+		-fontSize 14;
+}
+// End of Scan for old data ============================================================================================================
+
+
+
+
+global proc IK_to_FK_Quick()
+{
+    global string $Switch_Ctrl_name;
+    string $selection[] = `ls -sl`;
+    global string $ShoulderJoint_quick = "" ;
+    global string $ElbowJoint_quick = "";
+    global string $WristJoint_quick = "";
+    global string $FK_Shoulder_Ctrl_quick = "";
+    global string $FK_Elbow_Ctrl_quick = "";
+    global string $FK_Wrist_Ctrl_quick = "";
+    global string $PoleVector_Ctrl_quick = "";
+    global string $IK_Wrist_Ctrl_quick = "";
+    global string $Switch_attr_quick = "";
+    global float $IK__value_quick ;
+    global float $FK__value_quick ;
+
+    // Scan for old data =================================================
+    string $All_IK_FK_transform[] = `ls -type "transform" "*:IK_TO_FK_Limbs*" "*IK_TO_FK_Limbs*"`;
+	if(size($All_IK_FK_transform) > 0)
+	{
+		for($item in $All_IK_FK_transform)
+        {
+            string $Chains[] = `listRelatives -c $item`;
+            for($Chain in $Chains)
+            {
+                string $Limb_data[] = `listAttr -userDefined $Chain`;
+                for($limbo in $Limb_data)
+                {
+                    string $St_data = `getAttr ($Chain + "." + $limbo)`;
+                    if($St_data == $selection[0])
+                    {
+                        //print $Limb_data;
+                        $ShoulderJoint_quick = `getAttr ($Chain + "." + $Limb_data[0])`;
+                        $ElbowJoint_quick = `getAttr ($Chain + "." + $Limb_data[1])`;
+                        $WristJoint_quick = `getAttr ($Chain + "." + $Limb_data[2])`;
+                        $FK_Shoulder_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[3])`;
+                        $FK_Elbow_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[4])`;
+                        $FK_Wrist_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[5])`;
+                        $PoleVector_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[6])`;
+                        $IK_Wrist_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[7])`;
+                        if(size($Limb_data) > 8)
+                        {
+                            $Switch_Ctrl_name = `getAttr ($Chain + "." + $Limb_data[8])`;
+                            $Switch_attr_quick = `getAttr ($Chain + "." + $Limb_data[9])`;
+                            $IK__value_quick = `getAttr ($Chain + "." + $Limb_data[10])`;
+                            $FK__value_quick = `getAttr ($Chain + "." + $Limb_data[11])`;
+                        }
+                        
+
+                        IK_to_FK(0);
+                    }
+                }
+            }
+
+        }
+
+        
+	}else{print "// Result: No data was found, Please fill the data then click Prepare";}
+
+}
+
+
+global proc FK_to_IK_Quick()
+{
+    global string $Switch_Ctrl_name;
+    string $selection[] = `ls -sl`;
+    global string $ShoulderJoint_quick = "" ;
+    global string $ElbowJoint_quick = "";
+    global string $WristJoint_quick = "";
+    global string $FK_Shoulder_Ctrl_quick = "";
+    global string $FK_Elbow_Ctrl_quick = "";
+    global string $FK_Wrist_Ctrl_quick = "";
+    global string $PoleVector_Ctrl_quick = "";
+    global string $IK_Wrist_Ctrl_quick = "";
+    global string $Switch_attr_quick = "";
+    global float $IK__value_quick ;
+    global float $FK__value_quick ;
+
+    // Scan for old data =================================================
+    string $All_IK_FK_transform[] = `ls -type "transform" "*:IK_TO_FK_Limbs*" "*IK_TO_FK_Limbs*"`;
+	if(size($All_IK_FK_transform) > 0)
+	{
+		for($item in $All_IK_FK_transform)
+        {
+            string $Chains[] = `listRelatives -c $item`;
+            for($Chain in $Chains)
+            {
+                string $Limb_data[] = `listAttr -userDefined $Chain`;
+                for($limbo in $Limb_data)
+                {
+                    string $St_data = `getAttr ($Chain + "." + $limbo)`;
+                    if($St_data == $selection[0])
+                    {
+                        //print $Limb_data;
+                        $ShoulderJoint_quick = `getAttr ($Chain + "." + $Limb_data[0])`;
+                        $ElbowJoint_quick = `getAttr ($Chain + "." + $Limb_data[1])`;
+                        $WristJoint_quick = `getAttr ($Chain + "." + $Limb_data[2])`;
+                        $FK_Shoulder_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[3])`;
+                        $FK_Elbow_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[4])`;
+                        $FK_Wrist_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[5])`;
+                        $PoleVector_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[6])`;
+                        $IK_Wrist_Ctrl_quick = `getAttr ($Chain + "." + $Limb_data[7])`;
+                        if(size($Limb_data) > 8)
+                        {
+                            $Switch_Ctrl_name = `getAttr ($Chain + "." + $Limb_data[8])`;
+                            $Switch_attr_quick = `getAttr ($Chain + "." + $Limb_data[9])`;
+                            $IK__value_quick = `getAttr ($Chain + "." + $Limb_data[10])`;
+                            $FK__value_quick = `getAttr ($Chain + "." + $Limb_data[11])`;
+                        }
+                        
+
+                        FK_to_IK(0);
+                    }
+                }
+            }
+
+        }
+
+        
+	}else{print "// Result: No data was found, Please fill the data then click Prepare";}
+}
+
+
+
+
+
+
+// IK to FK match:======================================================================================================================
+global proc IK_to_FK(int $BakeAnimation)
+{
+	global string $Switch_Ctrl_name;
+    global string $ShoulderJoint_quick ;
+    global string $ElbowJoint_quick ;
+    global string $WristJoint_quick ;
+    global string $FK_Shoulder_Ctrl_quick ;
+    global string $FK_Elbow_Ctrl_quick ;
+    global string $FK_Wrist_Ctrl_quick ;
+    global string $PoleVector_Ctrl_quick ;
+    global string $IK_Wrist_Ctrl_quick ;
+    global string $Switch_attr_quick ;
+    global float $IK__value_quick ;
+    global float $FK__value_quick ;
+    
+    string $ShoulderJoint = $ShoulderJoint_quick;
+	string $ElbowJoint = $ElbowJoint_quick;
+	string $WristJoint = $WristJoint_quick;
+	string $FK_Shoulder_Ctrl = $FK_Shoulder_Ctrl_quick;
+	string $FK_Elbow_Ctrl = $FK_Elbow_Ctrl_quick;
+	string $FK_Wrist_Ctrl = $FK_Wrist_Ctrl_quick;
+	string $PoleVector_Ctrl = $PoleVector_Ctrl_quick;
+	string $IK_Wrist_Ctrl = $IK_Wrist_Ctrl_quick;
+    string $Switch_attr = $Switch_attr_quick ;
+    float $IK__value = $IK__value_quick ;
+    float $FK__value = $FK__value_quick ;
+	int $PrintResult = 1;
+    int $Auto_Switch = `checkBox -q -v AutoSwitch_quick_CHB`;
+    int $matchMethod_option = `optionMenu -q -sl MatchMethod_Menu`;
+
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+	
+
+	// get xform:
+	$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `; // Get world space translation of Shoulder Joint:
+	$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `; // Get world space rotation of Shoulder Joint:
+
+	$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `; // Get world space translation of Elbow Joint:
+	$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `; // Get world space rotation of Elbow Joint:
+
+	$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `; // Get world space translation of Wrist Joint:
+	$R_wrist_translate = ` xform -q -ws -t $WristJoint `; // Get world space rotation of Wrist Joint:
+
+
+	// Set xform:
+    delete `parentConstraint -w 1 $ElbowJoint ($FK_Elbow_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_jnt to FK_Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $WristJoint ($FK_Wrist_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from Wrist_jnt to FK_Wrist_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ShoulderJoint ($ShoulderJoint + "_WS_Jnt")`; // Transfer rotation and translation from Shoulder_jnt to Shoulder_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ElbowJoint ($ElbowJoint + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_jnt to Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $WristJoint ($WristJoint + "_WS_Jnt")`; // Transfer rotation and translation from Wrist_jnt to Wrist_WS_Jnt:
+
+    refresh -cv -f;
+
+	// Unlock FK rotate attr:
+	UnlockAttr($FK_Shoulder_Ctrl);
+	UnlockAttr($FK_Elbow_Ctrl);
+	UnlockAttr($FK_Wrist_Ctrl);
+
+	
+	//cycleCheck -e off;
+	
+    // Match FK_Shoulder_Ctrl to Shoulder_WS_Jnt:
+	if(`objExists ($ShoulderJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1){
+            string $orientC[] = ` parentConstraint -weight 1 ($ShoulderJoint + "_WS") $FK_Shoulder_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Shoulder_Ctrl};
+            delete $orientC;
+        }else{
+            // xform -ws -a -rp $Rshoulder_rotate[0] $Rshoulder_rotate[1] $Rshoulder_rotate[2] $FK_Shoulder_Ctrl;
+            matchTransform  $FK_Shoulder_Ctrl ($ShoulderJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Shoulder_Ctrl};
+        }
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match FK_Elbow_Ctrl to Elbow_WS_Jnt:
+	if(`objExists ($ElbowJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1){
+            string $orientC[] = ` parentConstraint  -weight 1 ($ElbowJoint + "_WS") $FK_Elbow_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Elbow_Ctrl};
+            delete $orientC;
+        }else{
+            // xform -ws -ro $R_elbow_rotate[0] $R_elbow_rotate[1] $R_elbow_rotate[2] $FK_Elbow_Ctrl;
+            matchTransform  $FK_Elbow_Ctrl ($ElbowJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Elbow_Ctrl};
+        }
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match FK_Wrist_Ctrl to Wrist_WS_Jnt:
+	if(`objExists ($WristJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1){
+            string $orientC[] = ` parentConstraint  -weight 1 ($WristJoint + "_WS") $FK_Wrist_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Wrist_Ctrl};
+            delete $orientC;
+        }else{
+            // xform -ws -ro $R_wrist_rotate[0] $R_wrist_rotate[1] $R_wrist_rotate[2] $FK_Wrist_Ctrl;
+            matchTransform   $FK_Wrist_Ctrl ($WristJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Wrist_Ctrl};
+        }
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+	//cycleCheck -e on;
+
+    // Switch from IK to FK:
+    if($Auto_Switch)
+    {
+        if(`attributeExists $Switch_attr_only $Switch_Ctrl_name`)
+        {
+            setKeyframe  -value $IK__value -time (`currentTime -q` -1) $Switch_attr; 
+            setKeyframe  -value $FK__value -time (`currentTime -q`) $Switch_attr; 
+            setAttr $Switch_attr $FK__value;
+        }
+    }
+
+
+	if($PrintResult)
+	{
+		print ("\n" + " // Result: IK has baked to FK at frame: " + (`currentTime -q`));
+	}
+}// End of IK to FK match:==============================================================================================================
+
+
+
+// FK to IK match:======================================================================================================================
+global proc FK_to_IK(int $BakeAnimation)
+{
+	global string $Switch_Ctrl_name;
+    global string $ShoulderJoint_quick ;
+    global string $ElbowJoint_quick ;
+    global string $WristJoint_quick ;
+    global string $FK_Shoulder_Ctrl_quick ;
+    global string $FK_Elbow_Ctrl_quick ;
+    global string $FK_Wrist_Ctrl_quick ;
+    global string $PoleVector_Ctrl_quick ;
+    global string $IK_Wrist_Ctrl_quick ;
+    global string $Switch_attr_quick ;
+    global float $IK__value_quick ;
+    global float $FK__value_quick ;
+    
+    string $ShoulderJoint = $ShoulderJoint_quick;
+	string $ElbowJoint = $ElbowJoint_quick;
+	string $WristJoint = $WristJoint_quick;
+	string $FK_Shoulder_Ctrl = $FK_Shoulder_Ctrl_quick;
+	string $FK_Elbow_Ctrl = $FK_Elbow_Ctrl_quick;
+	string $FK_Wrist_Ctrl = $FK_Wrist_Ctrl_quick;
+	string $PoleVector_Ctrl = $PoleVector_Ctrl_quick;
+	string $IK_Wrist_Ctrl = $IK_Wrist_Ctrl_quick;
+    string $Switch_attr = $Switch_attr_quick ;
+    float $IK__value = $IK__value_quick ;
+    float $FK__value = $FK__value_quick ;
+    int $PoleVector_to_FkElbow = `checkBox -q -v PoleVector_to_FkElbow_quick_CHB`;
+	int $PrintResult = 1;
+    int $Auto_Switch = `checkBox -q -v AutoSwitch_quick_CHB`;
+    int $matchMethod_option = `optionMenu -q -sl MatchMethod_Menu`;
+
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+
+
+	// get xform:
+	$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `;
+	$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `;
+
+	$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `;
+	$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `;
+
+	$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `;
+	$R_wrist_translate = ` xform -q -ws -t $WristJoint `;
+
+
+	// Set xform:
+    delete `parentConstraint -w 1 $ElbowJoint ($FK_Elbow_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to FK_Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $FK_Wrist_Ctrl ($FK_Wrist_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from FK_Wrist_Ctrl to FK_Wrist_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ShoulderJoint ($ShoulderJoint + "_WS_Jnt")`; // Transfer rotation and translation from Shoulder_joint to Shoulder_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ElbowJoint ($ElbowJoint + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $WristJoint ($WristJoint + "_WS_Jnt")`; // Transfer rotation and translation from Wrist_joint to Wrist_WS_Jnt:
+
+    refresh -cv -f;
+
+    // Get distance between Elbow and PoleVector:
+    vector $one = `pointPosition ($FK_Elbow_Ctrl + "_WS")`;
+    vector $two = `pointPosition ($PoleVector_Ctrl + "_WS")`;
+    float $Dis_Elbow_PoleVector_result = mag ($one-$two);
+
+	// Get distance between Shoulder and Elbow:
+	$one = `pointPosition  ($ShoulderJoint + "_WS_Jnt")`;
+	$two = `pointPosition ($ElbowJoint + "_WS_Jnt")`;
+	float $Dis_Shoulder_Elbow_result = mag ($one-$two);
+
+	// Get distance between Wrist and Elbow:
+	$one = `pointPosition  ($WristJoint + "_WS_Jnt")`;
+	$two = `pointPosition ($ElbowJoint + "_WS_Jnt")`;
+	float $Dis_Wrist_Elbow_result = mag ($one-$two);
+
+
+    string $Pole_Avarage[] = `pointConstraint -w $Dis_Wrist_Elbow_result   ($ShoulderJoint + "_WS_Jnt")  ($PoleVector_Ctrl + "_WS")`;
+    pointConstraint -w $Dis_Shoulder_Elbow_result   ($WristJoint + "_WS_Jnt")   ($PoleVector_Ctrl + "_WS");
+    delete $Pole_Avarage; 
+    delete `aimConstraint -offset 0 0 0 -weight 1 -aimVector 0 0 -1 -upVector 0 1 0 -worldUpType "object" -worldUpObject ($ShoulderJoint + "_WS_Jnt") ($ElbowJoint + "_WS_Jnt") ($PoleVector_Ctrl + "_WS")`;
+    
+    // Get distance between Elbow and PoleVector_Loc:
+	$one = `pointPosition  ($FK_Elbow_Ctrl + "_WS_Jnt")`;
+	$two = `pointPosition ($PoleVector_Ctrl + "_WS")`;
+	float $Dis_Elbow_PoleVectorLoc_result = mag ($one-$two);
+
+    float $Elbow_Distance = $Dis_Elbow_PoleVectorLoc_result + $Dis_Elbow_PoleVector_result;
+    move -r -os -wd 0 0 (-$Elbow_Distance)  ($PoleVector_Ctrl + "_WS");
+
+
+
+
+	
+	// Match IK_Wrist_Ctrl to FK_Wrist_Ctrl_WS: 
+	if(`objExists ($FK_Wrist_Ctrl + "_WS")`)
+	{
+		if($matchMethod_option == 1)
+        {
+            string $parentC[]= ` parentConstraint  -weight 1 ($FK_Wrist_Ctrl + "_WS") $IK_Wrist_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$IK_Wrist_Ctrl};
+            delete $parentC;
+        }else{
+            matchTransform   $IK_Wrist_Ctrl ($FK_Wrist_Ctrl + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$IK_Wrist_Ctrl};
+        }
+        
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match PoleVector_Ctrl to (FK_Elbow_Ctrl_WS  or  PoleVector_Ctrl_WS):
+	if($PoleVector_to_FkElbow)
+	{
+		if(`objExists ($FK_Elbow_Ctrl + "_WS")`)
+		{
+			if($matchMethod_option == 1)
+            {
+                string $pointC[] = ` pointConstraint -offset 0 0 0 -weight 1 ($FK_Elbow_Ctrl + "_WS") $PoleVector_Ctrl `;
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+                delete $pointC;
+            }else{
+                matchTransform -pos  $PoleVector_Ctrl ($FK_Elbow_Ctrl + "_WS");
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+            }
+			
+		}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	}else{
+		if(`objExists($PoleVector_Ctrl + "_WS")`)
+		{
+            if($matchMethod_option == 1)
+            {
+                string $pointC[] = ` pointConstraint -offset 0 0 0 -weight 1 ($PoleVector_Ctrl + "_WS") $PoleVector_Ctrl `;
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+                delete $pointC;
+            }else{
+                matchTransform -pos  $PoleVector_Ctrl ($PoleVector_Ctrl + "_WS");
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+            }
+		
+		}
+	} 
+
+    // Switch from FK to IK:
+    if($Auto_Switch)
+    {
+        if(`attributeExists $Switch_attr_only $Switch_Ctrl_name`)
+        {
+            setKeyframe  -value $FK__value -time (`currentTime -q` -1) $Switch_attr; 
+            setKeyframe  -value $IK__value -time (`currentTime -q`) $Switch_attr; 
+            setAttr $Switch_attr $IK__value;
+        }
+    }
+
+
+	if($PrintResult)
+	{
+		print ("\n" + " // Result: FK has baked to IK at frame: " + (`currentTime -q`));
+	}
+	
+}// End of FK to IK match:==============================================================================================================
+
+
+
+// Unlock attribute for S_and_R:=========================================================================================================
+global proc UnlockAttr(string $item)
+{
+	string $selection = $item;
+	
+	int $RotateX = ` getAttr -l ($selection + ".rotateX") `;
+	int $RotateY = ` getAttr -l ($selection + ".rotateY") `;
+	int $RotateZ = ` getAttr -l ($selection + ".rotateZ") `;
+	
+	int $RotateXkeyable = ` getAttr -keyable ($selection + ".rotateX") `;
+	int $RotateYkeyable = ` getAttr -keyable ($selection + ".rotateY") `;
+	int $RotateZkeyable = ` getAttr -keyable ($selection + ".rotateZ") `;
+	
+	if($RotateX == 1){setAttr -l off ($selection + ".rotateX");}
+	if($RotateY == 1){setAttr -l off ($selection + ".rotateY");}
+	if($RotateZ == 1){setAttr -l off ($selection + ".rotateZ");}
+	
+	if($RotateXkeyable == 0){setAttr -keyable on ($selection + ".rotateX");}
+	if($RotateYkeyable == 0){setAttr -keyable on ($selection + ".rotateY");}
+	if($RotateZkeyable == 0){setAttr -keyable on ($selection + ".rotateZ");}
+}// End of Unlock attribute for S_and_R:=================================================================================================

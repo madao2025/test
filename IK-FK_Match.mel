@@ -1,0 +1,2699 @@
+////////////////////////////////////////////////////////////////////
+// Name:        IK - FK Matcher ( For Autodesk Maya )             //
+// Written by:  Khaled Hussein (KhaledGraphic@msn.com)            //
+// Version:     2.33                                              //
+//----------------------------------------------------------------//
+// Gumroad:     https://khaledhussein.gumroad.com                 //
+// Facebook:    www.facebook.com/khaled.graphic                   //
+// Youtube:     www.youtube.com/channel/UCZ1sYFZKE8bdHR7lMPhzTMQ  //
+// Vimeo:       https://vimeo.com/user71502391                    //
+////////////////////////////////////////////////////////////////////
+
+if (`window -exists IK_FK_Matcher`)
+{
+   deleteUI IK_FK_Matcher;
+}
+
+if(`windowPref -exists IK_FK_Matcher`)
+{
+	//windowPref -r IK_FK_Matcher;
+}
+
+if(`objExists "defaultLegacyAssetGlobalsData"`)
+{
+	lockNode -l off "defaultLegacyAssetGlobalsData";
+	delete "defaultLegacyAssetGlobalsData";
+}
+
+if(`dockControl -exists  "dockWindowsUI"`)
+{
+	deleteUI "dockWindowsUI";
+}
+
+global string $IKFKWindow = "";
+global string $Switch_Ctrl_name;
+
+// Start of content ====================================================================================================================
+//window -q -wh IK_FK_Matcher;
+$IKFKWindow =  `window -dockStation -rtf on -menuBar true -t "IK - FK Match v.2.33" -s on -wh 200 100  IK_FK_Matcher`;
+columnLayout -rowSpacing 5 -adj true;
+menu -label "File" -tearOff on;
+	menuItem -l "Import Data" -c "Import_data()";
+	menuItem -l "Export Data" -c "Export_data()";
+    menuItem -divider on;
+    menuItem -l "Rebuild Activated Limb" -c "Rebuild_Activated_Limb()" -annotation "Activate limb first, Then click ( Rebuild Activated Limb )";
+    menuItem -l "Rebuild all" -c "Rebuild_All()" -annotation "Rebuild all available limbs.";
+    menuItem -divider on;
+    menuItem -l "Update Activated Limb" -c "Update_Activated_Limb()" -annotation "Activate limb first, Then click (Update Activated Limb) to update limb with existing namespace";
+    menuItem -l "Update all" -c "Update_All()" -annotation "Update all available limbs with existing namespace.";
+
+menu -label "About" -tearOff on;
+	menuItem -label "Documentation" -c "launch -web \"https://docs.google.com/document/d/e/2PACX-1vTpezYtJ1cxWYrBCb7mSmjo8fm_PukFl57HQnGS_4WSyt3OQ3m8ZQI4s6JRS07zBgERiOc2__XUuCJn/pub\"";
+    menuItem -label "About" -c "About_win";
+separator -style "none" -h 15;
+image -image ($rootPath + "icon/IK-FK_Top_bar.png") ;
+separator -style "in" ;
+button -l "Dock UI" -h 20  -c dockWindow dockWindowButton;
+text -font "boldLabelFont" -l "Store joints and controllers , then click Prepare at initial pose";
+separator -style "in" ;
+
+frameLayout -l"Limb Data"  -collapse on -collapsable on -childArray -collapseCommand "LimbData_collapse()" -bgc .35 .5 .1 frameLayout_LimbData;
+frameLayout -e -vis on frameLayout_LimbData;
+text -l"" -h 1;
+
+rowLayout -numberOfColumns 3 // Shoulder Joint:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "Shoulder Joint  " ;
+    textField ShoulderJoint_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` ShoulderJoint_TXF;" ;
+    setParent ..;
+    
+rowLayout -numberOfColumns 3 // Elbow Joint:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "Elbow Joint  ";
+    textField ElbowJointTXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` ElbowJointTXF;";
+    setParent ..;
+    
+rowLayout -numberOfColumns 3 // Wrist Joint:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "Wrist Joint  ";
+    textField WristJoint_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` WristJoint_TXF;";
+    setParent ..;
+    
+rowLayout -numberOfColumns 3 // FK Shoulder Ctrl:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "FK Shoulder Ctrl  ";
+    textField FKShoulderCtrl_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` FKShoulderCtrl_TXF; UnlockSelection();";
+    setParent ..; 
+    
+rowLayout -numberOfColumns 3 // FK Elbow Ctrl:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "FK Elbow Ctrl  ";
+    textField FKElbowCtrl_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` FKElbowCtrl_TXF; UnlockSelection();";
+    setParent ..;   
+
+rowLayout -numberOfColumns 3 // FK Wrist Ctrl:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "FK Wrist Ctrl  ";
+    textField FKWristCtrl_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` FKWristCtrl_TXF; UnlockSelection();";
+    setParent ..;
+
+rowLayout -numberOfColumns 3 // PoleVector Ctrl:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "PoleVector Ctrl  ";
+    textField PoleVectorCtrl_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` PoleVectorCtrl_TXF;";
+    setParent ..;
+
+rowLayout -numberOfColumns 3 // IK Wrist Ctrl:------------------------------------
+    -columnWidth3 90 160 80
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -label "IK Wrist Ctrl  ";
+    textField IKWristCtrl_TXF;
+    button -l "Add selection" -c "textField -e -tx `ls -sl` IKWristCtrl_TXF;";
+    setParent ..;
+
+rowLayout -numberOfColumns 4 // Switch Ctrl:------------------------------------
+    -columnWidth4 130 50 50 80
+    -adjustableColumn 1
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  0
+    -columnAttach 3 "both"  0
+    -columnAttach 4 "both"  0;
+    textFieldGrp -l "Switch Ctrl " -columnAlign 1 "left" -columnAlign 2 "left" -columnWidth 1 60 -columnWidth 2 80 -adjustableColumn 2 SwitchCtrl_TXF;
+    textFieldGrp -l "IK " -columnAlign 1 "left" -columnAlign 2 "left" -columnWidth 1 15 -columnWidth 2 25 IK_value_TXF;
+    textFieldGrp -l "FK " -columnAlign 1 "left" -columnAlign 2 "left" -columnWidth 1 15 -columnWidth 2 25 FK_value_TXF;
+    button -l "Add selection" -c "Define_Switch_Ctrl();";
+    setParent ..;
+
+separator -style "in" ;
+
+rowLayout -numberOfColumns 5
+    -columnWidth5 40 60 50 60 80
+    -adjustableColumn 5
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  0
+    -columnAttach 3 "both"  0
+	-columnAttach 4 "right" 5
+	-columnAttach 5 "both"  0;
+    text -label "Search";
+	textField -tx "R_" Search_TXF;
+	text -label "Replace";
+	textField -tx "L_" Replace_TXF;
+    button -l "Search and Replace" -c "S_and_R";
+    setParent ..;
+
+
+setParent ..;
+separator -style "in" ;
+
+
+
+rowLayout -rowAttach 2 "top" 12 -numberOfColumns 2
+    -columnWidth2 190  30
+    -adjustableColumn 1
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    
+    columnLayout   -adjustableColumn on -childArray -rowSpacing 5;
+	    text -l "Available Limbs:"  -align "left";
+	    textScrollList 
+			-height 145 
+			-font "boldLabelFont"
+			-doubleClickCommand "assignSelection()" 
+			-annotation "Double Click to activate chain" 
+			-highlightColor .35 .5 .1 
+			CH_TSL;
+			setParent ..;
+			
+		columnLayout   -height 150 -childArray -rowSpacing 3;
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "ResetMode.png"  -annotation "  Refresh and clean fields  " -c "ClearF()";
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "retractInfluenceList.png" -annotation "  Decrease list  " -c "decrease()";
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "expandInfluenceList.png" -annotation "  Increase list  " -c "increase()";
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "moveLayerUp.png" -annotation "  Move UP  " -c "MoveUp_Limb()";
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "moveLayerDown.png" -annotation "  Move Down  " -c "MoveDown_Limb()";
+		 iconTextButton -style "iconAndTextHorizontal" -image1 "deleteActive.png" -annotation "  Delete Selection  " -width 20 -height 30 -c "DeleteSelection_Limb()";	 
+      setParent ..;
+    setParent ..;
+
+
+separator -style "in" ;
+
+rowLayout   
+	  -numberOfColumns 3
+    -columnWidth3 100 130 100
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    text -l "Activated Limb:   ";
+    textField -editable false  -text "Empty" -font "boldLabelFont" -bgc .1 .1 .1 ActivatedTXF;
+    setParent ..;
+
+separator -style "in" ;  
+rowLayout   
+	-numberOfColumns 3
+    -columnWidth3 100 130 100
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  5
+    -columnAttach 3 "both"  0;
+    button -annotation "use this function in IK mode" -l "IK to FK" -c "IK_to_FK(0)" -bgc .35 .5 .1;
+    button -l "Prepare" -c "prepare()" -bgc .35 .5 .1;
+    button -annotation "use this function in FK mode" -l "FK to IK" -c "FK_to_IK(0)" -bgc .35 .5 .1;
+    setParent ..;
+
+rowLayout   
+	-numberOfColumns 3
+    -columnWidth3 165 1 165
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+    button -annotation "use this function in IK mode" -l "IK to FK   ( All limbs )" -c "IKtoFK_All()" -bgc .6 .6 .5;
+    text -l "";
+    button -annotation "use this function in FK mode" -l "FK to IK   ( All limbs )" -c "FKtoIK_All()" -bgc .6 .6 .5;
+    setParent ..;
+
+separator -style "in" ;
+
+frameLayout -l"Bake Animation"  -collapse on -collapsable on -childArray -collapseCommand "LimbData_collapse()" -bgc .1 .1 .1;
+text -l"" -h 1;
+rowLayout -numberOfColumns 4
+    -columnWidth4 80 80 80 80
+    -adjustableColumn 4
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  0
+    -columnAttach 3 "both"  0
+	-columnAttach 4 "both"  0;
+    text -label "Start frame: " ;
+	textField StartFrame_TXF;
+	text -label "End frame: " ;
+    textField EndFrame_TXF;
+    setParent ..;
+
+rowLayout   
+	-numberOfColumns 3
+    -columnWidth3 165 1 165
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+    button -annotation "use this function in IK mode" -l "Bake  ( IK to FK )" -c "Bake_IKtoFK" -bgc .6 .6 .3;
+    text -l "";
+    button -annotation "use this function in FK mode" -l "Bake  ( FK to IK )" -c "Bake_FKtoIK" -bgc .6 .6 .3;
+    setParent ..;
+
+separator -style "shelf" ;
+
+rowLayout   
+	 -numberOfColumns 3
+    -columnWidth3 165 1 165
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+    button -annotation "use this function in IK mode" -l "Bake All ( IK to FK )" -c "BakeAll_IKtoFK" -bgc .6 .6 .5;
+    text -l "";
+    button -annotation "use this function in FK mode" -l "Bake All ( FK to IK )" -c "BakeAll_FKtoIK" -bgc .6 .6 .5;
+    setParent ..;
+
+text -l"" -h 1;
+setParent ..;
+
+
+frameLayout -l"Export , Import , Rebuild"  -collapse on -collapsable on -childArray -collapseCommand "LimbData_collapse()" -bgc .1 .1 .1;
+text -l"" -h 1;
+
+rowLayout 
+	-numberOfColumns 3
+    -columnWidth3 165 1 165 
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+
+    button -annotation "" -l "Export Data" -c "Export_data()" ;
+	text -label "" ;
+    button -annotation "" -l "Import Data" -c "Import_data()" ;
+    setParent ..;
+
+rowLayout 
+	-numberOfColumns 3
+    -columnWidth3 165 1 165 
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+
+    button -annotation "Activate limb first, Then click ( Rebuild Activated Limb )" -l "Rebuild Activated Limb" -c "Rebuild_Activated_Limb()" ;
+	text -label "" ;
+    button -annotation "Rebuild all available limbs." -l "Rebuild all" -c "Rebuild_All()" ;
+    setParent ..;
+
+rowLayout 
+	-numberOfColumns 3
+    -columnWidth3 165 1 165 
+    -adjustableColumn 2
+    -columnAlign  1 "left"
+    -columnAttach 1 "both"  0
+    -columnAttach 2 "both"  2
+    -columnAttach 3 "both"  0;
+
+    button -annotation "Activate limb first, Then click (Update Activated Limb) to update limb with existing namespace" -l "Update Activated Limb" -c "Update_Activated_Limb()" ;
+	text -label "" ;
+    button -annotation "Update all available limbs with existing namespace." -l "Update all" -c "Update_All()" ;
+    setParent ..;
+
+
+setParent ..;
+
+
+
+frameLayout -l"Settings"  -collapse off -collapsable on -childArray -collapseCommand "LimbData_collapse()" -bgc .1 .1 .1;
+text -l"" -h 1;
+checkBox -label "Match PoleVector to FK Elbow" -highlightColor .4 .6 .15 PoleVector_to_FkElbow_CHB; 
+checkBox -label "Print result per frame " -v on -highlightColor .4 .6 .15 PrintResult_CHB; 
+checkBox -label "Auto Switch " -ann "Auto switch from (IK to FK) or (FK to IK)" -v on  -highlightColor .4 .6 .15 AutoSwitch_CHB; 
+optionMenu -l "Match Method " -highlightColor .4 .6 .15 -cc "global int $MatchMethod_Selected; $MatchMethod_Selected= `optionMenu -q -select MatchMethod_MainMenu`;" MatchMethod_MainMenu;
+    menuItem -l "Constrain";
+    menuItem -l "Match Transforms";
+setParent ..;
+
+
+
+separator -style "in" ;
+progressBar -isInterruptable on -maxValue 10 -minValue 0 -height 15 -highlightColor .4 .5 .2   pBar;
+separator -style "in" ;
+image -image ($rootPath + "icon/IK-FK_Bot_bar.png")  ;
+
+showWindow IK_FK_Matcher;
+// End of content =======================================================================================================================
+
+// Get start frame and end frame:
+textField -e -tx (`playbackOptions -q -min`) StartFrame_TXF;
+textField -e -tx (`playbackOptions -q -max`) EndFrame_TXF;
+
+// Set latest option in Match Method:
+global int $MatchMethod_Selected ;
+if($MatchMethod_Selected > 0) optionMenu -e -select $MatchMethod_Selected MatchMethod_MainMenu;
+
+
+// Define Switch Ctrl:===================================================================================================================
+global proc Define_Switch_Ctrl()
+{
+    global string $Switch_Ctrl_name;
+    string $selection[] = `ls -sl`;
+    string $atter_Name_[] = `channelBox  -query  -selectedMainAttributes mainChannelBox`; 
+    $Switch_Ctrl_name = $selection[0]; // store switch ctrl:
+    
+    float $min_value_[];
+    float $max_value_[];
+    if(!catchQuiet (`attributeQuery -node $selection[0] -min $atter_Name_[0]`))
+        $min_value_ = `attributeQuery -node $selection[0] -min $atter_Name_[0]`; 
+    if(!catchQuiet (`attributeQuery -node $selection[0] -max $atter_Name_[0]`))
+        $max_value_ = `attributeQuery -node $selection[0] -max $atter_Name_[0]`;
+    //print ($selection[0] + $atter_Name_[0]);
+    textFieldGrp -e -tx ($selection[0] + "." + $atter_Name_[0]) SwitchCtrl_TXF;
+    textFieldGrp -e -tx $min_value_[0] IK_value_TXF;
+    textFieldGrp -e -tx $max_value_[0] FK_value_TXF;
+}
+// End of Define Switch Ctrl:===================================================================================================================
+
+
+// Unlock attribute:=====================================================================================================================
+global proc UnlockSelection()
+{
+	string $selection[] = `ls -sl`;
+	
+	int $RotateX = ` getAttr -l ($selection[0] + ".rotateX") `;
+	int $RotateY = ` getAttr -l ($selection[0] + ".rotateY") `;
+	int $RotateZ = ` getAttr -l ($selection[0] + ".rotateZ") `;
+	
+	int $RotateXkeyable = ` getAttr -keyable ($selection[0] + ".rotateX") `;
+	int $RotateYkeyable = ` getAttr -keyable ($selection[0] + ".rotateY") `;
+	int $RotateZkeyable = ` getAttr -keyable ($selection[0] + ".rotateZ") `;
+	
+	if($RotateX == 1){setAttr -l off ($selection[0] + ".rotateX");}
+	if($RotateY == 1){setAttr -l off ($selection[0] + ".rotateY");}
+	if($RotateZ == 1){setAttr -l off ($selection[0] + ".rotateZ");}
+	
+	if($RotateXkeyable == 0){setAttr -keyable on ($selection[0] + ".rotateX");}
+	if($RotateYkeyable == 0){setAttr -keyable on ($selection[0] + ".rotateY");}
+	if($RotateZkeyable == 0){setAttr -keyable on ($selection[0] + ".rotateZ");}
+}// End of Unlock attribute:=============================================================================================================
+
+
+global proc About_win()
+{
+	if (`window -exists about_window`)
+	{
+        deleteUI about_window;
+	}
+	window  -rtf on  -t "IK - FK Match" -dockStation -s on -wh 300 300  about_window;
+	columnLayout -rowSpacing 5 -adj true -height 300 -width 360;
+    //-text "IK - FK Matcher Tool for Maya \nVersion: 2.33" 
+			
+	text -l "" -h 5;
+	text -l "IK - FK Match Tool for Maya" -hyperlink on -font "boldLabelFont";
+	text -l "" -h 3;
+	separator -style "in" ;
+	text -l "Works for Riggs that don't have IK/FK match built-in " -hyperlink on -wordWrap off;
+	text -l "requires." -hyperlink on -wordWrap off -align "left" -font "boldLabelFont";
+	text -l "*  3 base joints, The same joints requested by HumanIk." -hyperlink on -wordWrap off -align "left";
+	text -l "*  3 standard FK controls, All FK rotation axis must be unlocked." -hyperlink on -wordWrap off -align "left";
+	text -l "*  1 IK control." -hyperlink on -wordWrap off -align "left";
+	text -l "*  1 Pole vector control." -hyperlink on -wordWrap off -align "left";
+	text -l "*  1 Switch control 'to automatically switch from IK to FK or FK to IK'" -hyperlink on -wordWrap off -align "left";
+
+	separator -style "in" ;
+	text -l "Version: 2.33" -hyperlink on;
+	text -l "Single freelancer license" -hyperlink on -font "boldLabelFont" ;
+	separator -style "in" ;
+	text -l "Written by" -font "boldLabelFont" -hyperlink on;
+	text -l "Khaled Hussein" -hyperlink on;
+	text -l "Rigging TD" -hyperlink on;
+	text -l "KhaledGraphic@msn.com\n" -hyperlink on;
+
+	showWindow about_window;
+}
+
+
+
+// Unlock attribute for S_and_R:=========================================================================================================
+global proc UnlockAttr(string $item)
+{
+	string $selection = $item;
+	
+	int $RotateX = ` getAttr -l ($selection + ".rotateX") `;
+	int $RotateY = ` getAttr -l ($selection + ".rotateY") `;
+	int $RotateZ = ` getAttr -l ($selection + ".rotateZ") `;
+	
+	int $RotateXkeyable = ` getAttr -keyable ($selection + ".rotateX") `;
+	int $RotateYkeyable = ` getAttr -keyable ($selection + ".rotateY") `;
+	int $RotateZkeyable = ` getAttr -keyable ($selection + ".rotateZ") `;
+	
+	if($RotateX == 1){setAttr -l off ($selection + ".rotateX");}
+	if($RotateY == 1){setAttr -l off ($selection + ".rotateY");}
+	if($RotateZ == 1){setAttr -l off ($selection + ".rotateZ");}
+	
+	if($RotateXkeyable == 0){setAttr -keyable on ($selection + ".rotateX");}
+	if($RotateYkeyable == 0){setAttr -keyable on ($selection + ".rotateY");}
+	if($RotateZkeyable == 0){setAttr -keyable on ($selection + ".rotateZ");}
+}// End of Unlock attribute for S_and_R:=================================================================================================
+
+
+// Namespace Replace End:============================================================================================
+global proc string NameSpace_ReplaceEnd(string $name_space, string $lastName)
+{
+    string $spliters[];
+    tokenize  $name_space ":" $spliters; // Remove namespace:
+    int $index_no = size($spliters)-1;
+    //print $index_no;
+    stringArrayRemoveAtIndex($index_no, $spliters);
+    $spliters[size($spliters)] = $lastName;
+    $name_space = stringArrayToString($spliters, ":");
+    //print $name_space;
+    return $name_space;
+}// End Namespace Replace End:=======================================================================================
+
+
+
+// Scan for old data ====================================================================================================================
+string $All_transform[] = `ls -type "transform" "*:IK_TO_FK_Limbs*" "IK_TO_FK_Limbs"`;
+if(size($All_transform) > 0)
+{
+    for($item in $All_transform)
+    {
+        string $Chains[] = `listRelatives -c $item`;
+        for($Chain in $Chains)
+        {
+            textScrollList -e -a $Chain CH_TSL;
+            /////////////////////////////////////////////////////////////////////////
+            string $Limb_data[] = `listAttr -userDefined $Chain`;
+            for($limbo in $Limb_data)
+            {
+                string $St_data = `getAttr ($Chain + "." + $limbo)`;
+                if(!`objExists $St_data`)
+                {
+                    //print $Limb_data;
+                    if($limbo == "IK_Value" || $limbo == "FK_Value")
+                    {
+                        //print $attr;
+                    }else{
+                        $ShoulderJoint_quick = `getAttr ($Chain + "." + $limbo)`;
+                        //print ("old name: " + $ShoulderJoint_quick + "\n");
+                        $ShoulderJoint_quick = NameSpace_ReplaceEnd($Chain, $ShoulderJoint_quick);
+                        //print ("New name: " + $ShoulderJoint_quick + "\n");
+                        setAttr -type "string" ($Chain + "." + $limbo) $ShoulderJoint_quick;
+                    }
+
+                }
+            }
+        }/////////////////////////////////////////////////////////////////////////////
+        
+    }
+    inViewMessage 
+		-smg ("<font color=\"#9CFF33\">" +  " (IK - FK) Data Received " ) 
+		-pos topCenter -bkc 0x00000000  
+		-fade  
+		-fadeOutTime 200 
+		-fadeStayTime 3000  
+		-fontSize 14;
+}else{print "// Result: No data was found, Please fill the data then click Prepare";}
+// End of Scan for old data ============================================================================================================
+
+
+
+
+// Activating limb:=====================================================================================================================
+global proc assignSelection()
+{
+	string $selection_01[0] = `textScrollList -q  -selectItem  CH_TSL`;
+    string $Limb_data[] = `listAttr -userDefined $selection_01[0]`;
+	
+	textField //ShoulderJoint_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".Shoulder_Joint")`)
+		ShoulderJoint_TXF;
+		
+	textField //ElbowJointTXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".Elbow_Joint")`)
+		ElbowJointTXF;
+		
+	textField //WristJoint_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".Wrist_Joint")`)
+		WristJoint_TXF;
+		
+	textField //FKShoulderCtrl_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".FK_Shoulder_Ctrl")`)
+		FKShoulderCtrl_TXF;
+		
+	textField //FKElbowCtrl_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".FK_Elbow_Ctrl")`)
+		FKElbowCtrl_TXF;
+		
+	textField //FKWristCtrl_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".FK_Wrist_Ctrl")`)
+		FKWristCtrl_TXF;
+		
+	textField //PoleVectorCtrl_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".PoleVector_Ctrl")`)
+		PoleVectorCtrl_TXF;
+		
+	textField //IKWristCtrl_TXF
+		-e 
+		-tx (`getAttr ($selection_01[0] + ".IK_Wrist_Ctrl")`)
+		IKWristCtrl_TXF;
+
+    if(size($Limb_data) > 8)
+    {
+        textFieldGrp //SwitchCtrl_TXF
+            -e 
+            -tx (`getAttr ($selection_01[0] + ".Switch_attr")`) ///////
+            SwitchCtrl_TXF;
+
+        textFieldGrp //IK_value_TXF 
+            -e 
+            -tx (`getAttr ($selection_01[0] + ".IK_Value")`)
+            IK_value_TXF;
+
+        textFieldGrp //FK_value_TXF 
+            -e 
+            -tx (`getAttr ($selection_01[0] + ".FK_Value")`)
+            FK_value_TXF;
+
+    }else{
+        textFieldGrp //SwitchCtrl_TXF
+            -e 
+            -tx ""
+            SwitchCtrl_TXF;
+
+        textFieldGrp //IK_value_TXF 
+            -e 
+            -tx ""
+            IK_value_TXF;
+
+        textFieldGrp //FK_value_TXF 
+            -e 
+            -tx ""
+            FK_value_TXF;
+    }
+		
+	
+	textField -e  -text $selection_01[0] ActivatedTXF;
+		
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" + "( " + $selection_01[0] + " )" + " Has been activated " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 200 
+			-fadeStayTime 3000  
+			-fontSize 14;
+}// End of Activating limb:=============================================================================================================
+
+
+
+
+
+// FK to IK match:======================================================================================================================
+global proc FK_to_IK(int $BakeAnimation)
+{
+	global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    float $IK__value = `textFieldGrp -q -tx IK_value_TXF`;
+    float $FK__value = `textFieldGrp -q -tx FK_value_TXF`;
+	int $PoleVector_to_FkElbow = `checkBox -q -v PoleVector_to_FkElbow_CHB` ; 
+	int $PrintResult = `checkBox -q -v PrintResult_CHB`;
+    int $Auto_Switch = `checkBox -q -v AutoSwitch_CHB`;
+    int $matchMethod_option = `optionMenu -q -sl MatchMethod_MainMenu`;
+
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+
+	// get xform:
+	$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `; // Shoulder joint rotation:
+	$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `; // Shoulder joint translation:
+
+	$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `; // Elbow joint rotation:
+	$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `; // Elbow joint translation:
+
+	$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `; // Wrist joint rotation:
+	$R_wrist_translate = ` xform -q -ws -t $WristJoint `; // Wrist joint translation:
+
+    $FK_wrist_rotate = ` xform -q -ws -ro $FK_Wrist_Ctrl `; // FK Ctrl rotation:
+	$FK_wrist_translate = ` xform -q -ws -t $FK_Wrist_Ctrl `; // FK Ctrl translation:
+
+	// Set xform:
+    delete `parentConstraint -w 1 $ElbowJoint ($FK_Elbow_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to FK_Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $FK_Wrist_Ctrl ($FK_Wrist_Ctrl + "_WS_Jnt")`; // transfer rotation and translation from FK_Wrist_Ctrl to FK_Wrist_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ShoulderJoint ($ShoulderJoint + "_WS_Jnt")`; // Transfer rotation and translation from Shoulder_joint to Shoulder_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ElbowJoint ($ElbowJoint + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $FK_Wrist_Ctrl ($WristJoint + "_WS_Jnt")`; // Transfer rotation and translation from FK_Wrist_Ctrl to Wrist_WS_Jnt:
+
+    
+	// Get distance between Elbow and PoleVector:
+    vector $one = `pointPosition ($FK_Elbow_Ctrl + "_WS")`;
+    vector $two = `pointPosition ($PoleVector_Ctrl + "_WS")`;
+    float $Dis_Elbow_PoleVector_result = mag ($one-$two);
+
+	// Get distance between Shoulder and Elbow:
+	$one = `pointPosition  ($ShoulderJoint + "_WS_Jnt")`;
+	$two = `pointPosition ($ElbowJoint + "_WS_Jnt")`;
+	float $Dis_Shoulder_Elbow_result = mag ($one-$two);
+
+	// Get distance between Wrist and Elbow:
+	$one = `pointPosition  ($WristJoint + "_WS_Jnt")`;
+	$two = `pointPosition ($ElbowJoint + "_WS_Jnt")`;
+	float $Dis_Wrist_Elbow_result = mag ($one-$two);
+
+
+    string $Pole_Avarage[] = `pointConstraint -w $Dis_Wrist_Elbow_result   ($ShoulderJoint + "_WS_Jnt")  ($PoleVector_Ctrl + "_WS")`;
+    pointConstraint -w $Dis_Shoulder_Elbow_result   ($WristJoint + "_WS_Jnt")   ($PoleVector_Ctrl + "_WS");
+    delete $Pole_Avarage; 
+    delete `aimConstraint -offset 0 0 0 -weight 1 -aimVector 0 0 -1 -upVector 0 1 0 -worldUpType "object" -worldUpObject ($ShoulderJoint + "_WS_Jnt") ($ElbowJoint + "_WS_Jnt") ($PoleVector_Ctrl + "_WS")`;
+    
+    // Get distance between Elbow and PoleVector_Loc:
+	$one = `pointPosition  ($FK_Elbow_Ctrl + "_WS_Jnt")`;
+	$two = `pointPosition ($PoleVector_Ctrl + "_WS")`;
+	float $Dis_Elbow_PoleVectorLoc_result = mag ($one-$two);
+
+    float $Elbow_Distance = $Dis_Elbow_PoleVectorLoc_result + $Dis_Elbow_PoleVector_result;
+    move -r -os -wd 0 0 (-$Elbow_Distance)  ($PoleVector_Ctrl + "_WS");
+    
+	
+	
+    // Match IK_Wrist_Ctrl to FK_Wrist_Ctrl_WS:
+	if(`objExists ($FK_Wrist_Ctrl + "_WS")`)
+	{
+		if($matchMethod_option == 1)
+        {
+            string $parentC[]= ` parentConstraint  -weight 1 ($FK_Wrist_Ctrl + "_WS") $IK_Wrist_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$IK_Wrist_Ctrl};
+            delete $parentC;
+        }else{
+            matchTransform $IK_Wrist_Ctrl ($FK_Wrist_Ctrl + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$IK_Wrist_Ctrl};
+        }
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match PoleVector_Ctrl to (FK_Elbow_Ctrl_WS  or  PoleVector_Ctrl_WS):
+	if($PoleVector_to_FkElbow)
+	{
+		if(`objExists ($FK_Elbow_Ctrl + "_WS")`)
+		{
+			if($matchMethod_option == 1)
+            {
+                string $pointC[] = ` pointConstraint -offset 0 0 0 -weight 1 ($FK_Elbow_Ctrl + "_WS") $PoleVector_Ctrl `;
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+                delete $pointC;
+            }else{
+                matchTransform $PoleVector_Ctrl ($FK_Elbow_Ctrl + "_WS");
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+            }
+			
+		}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	}else{
+		if(`objExists($PoleVector_Ctrl + "_WS")`)
+		{
+            if($matchMethod_option == 1)
+            {
+                string $pointC[] = ` pointConstraint -offset 0 0 0 -weight 1 ($PoleVector_Ctrl + "_WS") $PoleVector_Ctrl `;
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+                delete $pointC;
+            }else{
+                matchTransform $PoleVector_Ctrl ($PoleVector_Ctrl + "_WS");
+                setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$PoleVector_Ctrl};
+            }
+		
+		}
+	} 
+
+    // Switch from FK to IK:
+    if($Auto_Switch)
+    {
+        if(`attributeExists $Switch_attr_only $Switch_Ctrl_name`)
+        {
+            if(!$BakeAnimation) {setKeyframe  -value $FK__value -time (`currentTime -q` -1) $Switch_attr;}
+            setKeyframe  -value $IK__value -time (`currentTime -q`) $Switch_attr;
+            setAttr $Switch_attr $IK__value;
+            if($BakeAnimation) 
+            {
+                setKeyframe  -value $FK__value -time (`currentTime -q` +1) $Switch_attr;
+            }
+        }
+    }
+
+	if($PrintResult)
+	{
+		print ("\n" + (`textField -q  -text ActivatedTXF`) + " : FK has baked to IK at frame: " + (`currentTime -q`));
+	}
+	
+}// End of FK to IK match:==============================================================================================================
+
+
+
+
+
+// IK to FK match:======================================================================================================================
+global proc IK_to_FK(int $BakeAnimation)
+{
+	global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    float $IK__value = `textFieldGrp -q -tx IK_value_TXF`;
+    float $FK__value = `textFieldGrp -q -tx FK_value_TXF`;
+	int $PrintResult = `checkBox -q -v PrintResult_CHB`;
+    int $Auto_Switch = `checkBox -q -v AutoSwitch_CHB`;
+    int $matchMethod_option = `optionMenu -q -sl MatchMethod_MainMenu`;
+	
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+
+	// Get xform:
+	$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `; // Get world space rotation of Shoulder Joint:
+	$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `; // Get world space translation of Shoulder Joint:
+
+	$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `; // Get world space rotation of Elbow Joint:
+	$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `; // Get world space translation of Elbow Joint:
+
+	$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `; // Get world space rotation of Wrist Joint:
+	$R_wrist_translate = ` xform -q -ws -t $WristJoint `; // Get world space translation of Wrist Joint:
+
+
+	// Set xform:
+    delete `parentConstraint -w 1 $ElbowJoint ($FK_Elbow_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to FK_Elbow_WS_Jnt:
+
+    //delete `parentConstraint -w 1 $WristJoint ($FK_Wrist_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from FK_Wrist_Ctrl to FK_Wrist_WS_Jnt:
+	delete `parentConstraint -w 1 $FK_Wrist_Ctrl ($FK_Wrist_Ctrl + "_WS_Jnt")`; // Transfer rotation and translation from FK_Wrist_Ctrl to FK_Wrist_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ShoulderJoint ($ShoulderJoint + "_WS_Jnt")`; // Transfer rotation and translation from Shoulder_joint to Shoulder_WS_Jnt:
+
+    delete `parentConstraint -w 1 $ElbowJoint ($ElbowJoint + "_WS_Jnt")`; // Transfer rotation and translation from Elbow_joint to Elbow_WS_Jnt:
+
+    delete `parentConstraint -w 1 $WristJoint ($WristJoint + "_WS_Jnt")`; // Transfer rotation and translation from Wrist_joint to Wrist_WS_Jnt:
+
+
+
+	// Unlock FK rotate attr:
+	UnlockAttr($FK_Shoulder_Ctrl);
+	UnlockAttr($FK_Elbow_Ctrl);
+	UnlockAttr($FK_Wrist_Ctrl);
+
+	
+	//cycleCheck -e off;
+	
+    // Match FK_Shoulder_Ctrl to Shoulder_WS_Jnt:
+	if(`objExists ($ShoulderJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1)
+        {
+            string $orientC[] = ` parentConstraint -weight 1 ($ShoulderJoint + "_WS") $FK_Shoulder_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Shoulder_Ctrl};
+            delete $orientC;
+        }else{
+            matchTransform $FK_Shoulder_Ctrl ($ShoulderJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Shoulder_Ctrl};
+        }
+        
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match FK_Elbow_Ctrl to Elbow_WS_Jnt:
+	if(`objExists ($ElbowJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1)
+        {
+            string $orientC[] = ` parentConstraint  -weight 1 ($ElbowJoint + "_WS") $FK_Elbow_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Elbow_Ctrl};
+            delete $orientC;
+        }else{
+            matchTransform $FK_Elbow_Ctrl ($ElbowJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Elbow_Ctrl};
+        }
+        
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+    // Match FK_Wrist_Ctrl to Wrist_WS_Jnt:
+	if(`objExists ($WristJoint + "_WS")`)
+	{
+		if($matchMethod_option == 1)
+        {
+            string $orientC[] = ` parentConstraint  -weight 1 ($WristJoint + "_WS") $FK_Wrist_Ctrl `;
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Wrist_Ctrl};
+            delete $orientC;
+        }else{
+            matchTransform $FK_Wrist_Ctrl ($WristJoint + "_WS");
+            setKeyframe -breakdown 0 -hierarchy none -controlPoints 0 -shape 0 {$FK_Wrist_Ctrl};
+        }
+        
+	}else{error -noContext "  Please click prepare at initial pose before use FK_to_IK function  ";}
+	
+	//cycleCheck -e on;
+	
+    
+    // Switch from IK to FK:
+    if($Auto_Switch)
+    {
+        if(`attributeExists $Switch_attr_only $Switch_Ctrl_name`)
+        {
+            if(!$BakeAnimation) {setKeyframe  -value $IK__value -time (`currentTime -q` -1) $Switch_attr;}
+            setKeyframe  -value $FK__value -time (`currentTime -q`) $Switch_attr;
+            setAttr $Switch_attr $FK__value;
+            if($BakeAnimation) {setKeyframe  -value $IK__value -time (`currentTime -q` +1) $Switch_attr;}
+        }
+    }
+    
+    if($PrintResult)
+	{
+		print ((`textField -q  -text ActivatedTXF`) + " : IK has baked to FK at frame: " + (`currentTime -q`));
+	}
+}// End of IK to FK match:==============================================================================================================
+
+
+
+
+
+// Prepare limb:========================================================================================================================
+global proc prepare()
+{
+	global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;	
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    string $IK_value = `textFieldGrp -q -tx IK_value_TXF`;
+    string $FK_value = `textFieldGrp -q -tx FK_value_TXF`;
+    
+
+
+	// Get xform:
+	$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `;
+	$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `;
+
+	$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `;
+	$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `;
+
+	$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `;
+	$R_wrist_translate = ` xform -q -ws -t $WristJoint `;
+
+
+    // get rotation order"
+    $Shoulder_jnt_rotateOrder =  `getAttr ($ShoulderJoint + ".rotateOrder")` ;
+    $Elbow_jnt_rotateOrder =  `getAttr ($ElbowJoint + ".rotateOrder")` ;
+    $Wrist_jnt_rotateOrder =  `getAttr ($WristJoint + ".rotateOrder")` ;
+
+
+	
+	string $Chain_name_PD0 = ` promptDialog -message "Enter Chain Name:                      " -text "R_Arm" -title "Chain name" `;
+	if($Chain_name_PD0 == "Confirm")
+	{
+		
+		string $ChainName = `promptDialog -q -text`;
+	
+		if(`objExists $ChainName`){delete $ChainName;}
+		
+		// Create Elbow_Loc.
+		select -cl;
+		string $Elbow_Jnt =  `joint -n ($FK_Elbow_Ctrl + "_WS_Jnt")`;
+		string $Elbow_Loc[0] = ` spaceLocator -name ($FK_Elbow_Ctrl + "_WS") -p 0 0 0`;
+		//xform -ws -ro $R_elbow_rotate[0] $R_elbow_rotate[1] $R_elbow_rotate[2] $Elbow_Jnt;
+		//xform -ws -t $R_elbow_translate[0] $R_elbow_translate[1] $R_elbow_translate[2] $Elbow_Jnt;
+		delete `parentConstraint -w 1 $ElbowJoint $Elbow_Jnt`;
+
+		parent $Elbow_Loc[0] $Elbow_Jnt;
+		setAttr ($Elbow_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Elbow_Loc[0] + ".rotate") 0 0 0;
+        //delete `orientConstraint -offset 0 0 0 -weight 1 $FK_Elbow_Ctrl $Elbow_Loc[0]` ;
+
+		
+		// Create Wrist_Loc.
+		select -cl;
+		string $Wrist_Jnt = `joint -n ($FK_Wrist_Ctrl + "_WS_Jnt") -p 0 0 0`;
+		string $Wrist_Loc[0] = ` spaceLocator -name ($FK_Wrist_Ctrl + "_WS") -p 0 0 0`;
+		//xform -ws -ro $R_wrist_rotate[0] $R_wrist_rotate[1] $R_wrist_rotate[2] $Wrist_Jnt;
+		//xform -ws -t $R_wrist_translate[0] $R_wrist_translate[1] $R_wrist_translate[2] $Wrist_Jnt;
+        delete `parentConstraint  -weight 1 $FK_Wrist_Ctrl $Wrist_Jnt` ;
+		
+		parent $Wrist_Loc[0] $Wrist_Jnt;
+		setAttr ($Wrist_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Wrist_Loc[0] + ".rotate") 0 0 0;
+		delete `orientConstraint -offset 0 0 0 -weight 1 $IK_Wrist_Ctrl $Wrist_Loc` ;
+		
+
+
+		// Create Shoulder_Loc.
+		select -cl;
+		string $Shoulder_Jnt = `joint -n ($ShoulderJoint + "_WS_Jnt") -p 0 0 0`;
+		string $Shoulder_Loc[0] = ` spaceLocator -name ($ShoulderJoint + "_WS") -p 0 0 0`;
+        setAttr ($Shoulder_Jnt + ".rotateOrder") $Shoulder_jnt_rotateOrder;
+		//xform -ws -ro $Rshoulder_rotate[0] $Rshoulder_rotate[1] $Rshoulder_rotate[2] $Shoulder_Jnt;
+		//xform -ws -t $Rshoulder_translate[0] $Rshoulder_translate[1] $Rshoulder_translate[2] $Shoulder_Jnt;
+		delete `parentConstraint -w 1 $ShoulderJoint $Shoulder_Jnt`;
+		
+		parent $Shoulder_Loc[0] $Shoulder_Jnt;
+		setAttr ($Shoulder_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Shoulder_Loc[0] + ".rotate") 0 0 0;
+        delete `orientConstraint -offset 0 0 0 -weight 1 $ShoulderJoint $Shoulder_Loc[0]` ;
+		//parentConstraint  -weight 1 $ShoulderJoint $Shoulder_Loc ;
+		
+
+
+		// Create ElbowToFK_Loc.
+		select -cl;
+		string $ElbowToFK_Jnt = `joint -n ($ElbowJoint + "_WS_Jnt") -p 0 0 0`;
+		string $ElbowToFK_Loc[0] = ` spaceLocator -name ($ElbowJoint + "_WS") -p 0 0 0`;
+        setAttr ($ElbowToFK_Jnt + ".rotateOrder") $Elbow_jnt_rotateOrder;
+		//xform -ws -ro $R_elbow_rotate[0] $R_elbow_rotate[1] $R_elbow_rotate[2] $ElbowToFK_Jnt;
+		//xform -ws -t $R_elbow_translate[0] $R_elbow_translate[1] $R_elbow_translate[2] $ElbowToFK_Jnt;
+        delete `parentConstraint -w 1 $ElbowJoint $ElbowToFK_Jnt`;
+		
+		parent $ElbowToFK_Loc[0] $ElbowToFK_Jnt;
+		setAttr ($ElbowToFK_Loc[0] + ".translate") 0 0 0;
+		setAttr ($ElbowToFK_Loc[0] + ".rotate") 0 0 0;
+		//parentConstraint  -weight 1 $ElbowJoint $ElbowToFK_Loc ;
+		
+
+
+
+		// PoleVector_Loc.
+		string $PoleVector_Loc[0] = ` spaceLocator -name ($PoleVector_Ctrl + "_WS") -p 0 0 0`;
+		string $temp_pointConstraint[] = `pointConstraint -offset 0 0 0 -weight 1 $PoleVector_Ctrl $PoleVector_Loc` ;
+		delete $temp_pointConstraint;
+		parent $PoleVector_Loc $ElbowToFK_Loc;	
+
+
+
+
+		// Create WristToFK_Loc.
+		select -cl;
+		string $WristToFK_Jnt = `joint -n ($WristJoint + "_WS_Jnt") -p 0 0 0`;
+		string $WristToFK_Loc[0] = ` spaceLocator -name ($WristJoint + "_WS") -p 0 0 0`;
+        setAttr ($WristToFK_Jnt + ".rotateOrder") $Wrist_jnt_rotateOrder;
+		//xform -ws -ro $R_wrist_rotate[0] $R_wrist_rotate[1] $R_wrist_rotate[2] $WristToFK_Jnt;
+		//xform -ws -t $R_wrist_translate[0] $R_wrist_translate[1] $R_wrist_translate[2] $WristToFK_Jnt;
+        delete `parentConstraint -w 1 $WristJoint $WristToFK_Jnt`;
+		
+		parent $WristToFK_Loc[0] $WristToFK_Jnt;
+		setAttr ($WristToFK_Loc[0] + ".translate") 0 0 0;
+		setAttr ($WristToFK_Loc[0] + ".rotate") 0 0 0;
+        delete `orientConstraint -offset 0 0 0 -weight 1 $FK_Wrist_Ctrl $WristToFK_Loc[0]` ;
+		//parentConstraint  -weight 1 $WristJoint $WristToFK_Loc ;
+
+
+		
+		// Group all temp locators.
+		group -n $ChainName $Elbow_Jnt $Wrist_Jnt $Shoulder_Jnt $ElbowToFK_Jnt $WristToFK_Jnt ;
+		setAttr ($ChainName + ".visibility") 0;
+		if(`objExists "IK_TO_FK_Limbs"`)
+		{
+			parent $ChainName "IK_TO_FK_Limbs";
+		}else{
+			group -n "IK_TO_FK_Limbs" $ChainName;
+		}
+		
+	
+		
+		// Save work.
+		addAttr -ln "Shoulder_Joint"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".Shoulder_Joint") $ShoulderJoint;
+		
+		addAttr -ln "Elbow_Joint"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".Elbow_Joint") $ElbowJoint;
+		
+		addAttr -ln "Wrist_Joint"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".Wrist_Joint") $WristJoint;
+		
+		addAttr -ln "FK_Shoulder_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".FK_Shoulder_Ctrl") $FK_Shoulder_Ctrl;
+		
+		addAttr -ln "FK_Elbow_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".FK_Elbow_Ctrl") $FK_Elbow_Ctrl;
+		
+		addAttr -ln "FK_Wrist_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".FK_Wrist_Ctrl") $FK_Wrist_Ctrl;
+		
+		addAttr -ln "PoleVector_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".PoleVector_Ctrl") $PoleVector_Ctrl;
+		
+		addAttr -ln "IK_Wrist_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".IK_Wrist_Ctrl") $IK_Wrist_Ctrl;
+
+        addAttr -ln "Switch_Ctrl"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".Switch_Ctrl") $Switch_Ctrl_name;
+		
+        addAttr -ln "Switch_attr"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".Switch_attr") $Switch_attr;
+    
+        addAttr -ln "IK_Value"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".IK_Value") $IK_value;
+
+        addAttr -ln "FK_Value"  -dt "string"  $ChainName;
+		setAttr -type "string" ($ChainName + ".FK_Value") $FK_value;
+
+	
+		// Add chain to tist:
+		textScrollList -e  -append  $ChainName  CH_TSL;
+	}//
+	
+	
+	
+}// End of Prepare limb:================================================================================================================
+
+
+// Clear and refresh:===================================================================================================================
+global proc ClearF()
+{
+	textField -e -tx "" ShoulderJoint_TXF;
+	textField -e -tx "" ElbowJointTXF;
+	textField -e -tx "" WristJoint_TXF;
+	textField -e -tx "" FKShoulderCtrl_TXF;
+	textField -e -tx "" FKElbowCtrl_TXF;
+	textField -e -tx "" FKWristCtrl_TXF;
+	textField -e -tx "" PoleVectorCtrl_TXF;
+	textField -e -tx "" IKWristCtrl_TXF;
+    textFieldGrp -e -tx "" SwitchCtrl_TXF;
+    textFieldGrp -e -tx "" IK_value_TXF;
+    textFieldGrp -e -tx "" FK_value_TXF;
+	
+	textField -e  -text "Empty" ActivatedTXF;
+	textScrollList -e -ra CH_TSL;
+	
+	// Scan for old data ====================================================================================================================
+	string $All_transform[] = `ls -type "transform" "*:IK_TO_FK_Limbs*" "IK_TO_FK_Limbs"`;
+	if(size($All_transform) > 0)
+	{
+		for($item in $All_transform)
+		{
+			string $Chains[] = `listRelatives -c $item`;
+			for($Chain in $Chains)
+			{
+				textScrollList -e -a $Chain CH_TSL;
+				/////////////////////////////////////////////////////////////////////////
+				string $Limb_data[] = `listAttr -userDefined $Chain`;
+				for($limbo in $Limb_data)
+				{
+					string $St_data = `getAttr ($Chain + "." + $limbo)`;
+					if(!`objExists $St_data`)
+					{
+						//print $Limb_data;
+						if($limbo == "IK_Value" || $limbo == "FK_Value")
+						{
+							//print $attr;
+						}else{
+							$ShoulderJoint_quick = `getAttr ($Chain + "." + $limbo)`;
+							//print ("old name: " + $ShoulderJoint_quick + "\n");
+							$ShoulderJoint_quick = NameSpace_ReplaceEnd($Chain, $ShoulderJoint_quick);
+							//print ("New name: " + $ShoulderJoint_quick + "\n");
+							setAttr -type "string" ($Chain + "." + $limbo) $ShoulderJoint_quick;
+						}
+
+					}
+				}
+			}/////////////////////////////////////////////////////////////////////////////
+			
+		}
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " (IK - FK) Data Received " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 200 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	}else{print "// Result: No data was found, Please fill the data then click Prepare";}
+
+}// End of Clear and refresh:===========================================================================================================
+
+
+// increase TSL:========================================================================================================================
+global proc increase()
+{
+	int $ScrollHeight = `textScrollList -q -height CH_TSL`;
+	textScrollList -e -height ($ScrollHeight + 10) CH_TSL;
+}// End of increase TSL:================================================================================================================
+
+
+// decrease TSL:========================================================================================================================
+global proc decrease()
+{
+	int $ScrollHeight = `textScrollList -q -height CH_TSL`;
+	int $windowScale = `window -q -h IK_FK_Matcher`;
+	textScrollList -e -height ($ScrollHeight - 10) CH_TSL;
+	window -e -h ($windowScale - 10) IK_FK_Matcher;
+}// End of decrease TSL:================================================================================================================
+
+
+// MoveDown_Limb TSL:===================================================================================================================
+global proc MoveDown_Limb()
+{
+	string $selection0[0] = `textScrollList -q  -selectItem CH_TSL`;
+	int $selectIndexedItem0[0] = `textScrollList -q  -selectIndexedItem  CH_TSL`;
+	int $numberOfItems = `textScrollList -q  -numberOfItems  CH_TSL`;
+	if(size($selection0)==1)
+	{
+		if($selectIndexedItem0[0] == $numberOfItems)
+		{
+			
+		}else{
+			textScrollList -e  -removeItem  $selection0[0] CH_TSL; //Remove selection
+			textScrollList -e  -appendPosition ($selectIndexedItem0[0] +1) $selection0[0] CH_TSL; // Append removed item
+			textScrollList -e  -selectItem  $selection0[0] CH_TSL; // Select new position
+		}
+	}
+	
+}// End of MoveDown_Limb TSL:===========================================================================================================
+
+
+// MoveUp_Limb TSL:=====================================================================================================================
+global proc MoveUp_Limb()
+{
+	string $selection0[0] = `textScrollList -q  -selectItem CH_TSL`;
+	int $selectIndexedItem0[0] = `textScrollList -q  -selectIndexedItem  CH_TSL`;
+	
+	if($selectIndexedItem0[0] == 1)
+	{
+		
+	}else if($selectIndexedItem0[0] == 0)
+	{
+		
+	}else{
+		textScrollList -e  -removeItem  $selection0[0] CH_TSL; //Remove selection
+		textScrollList -e  -appendPosition ($selectIndexedItem0[0] -1) $selection0[0] CH_TSL; // Append removed item
+		textScrollList -e  -selectItem  $selection0[0] CH_TSL; // Select new position
+	}
+
+}// End of MoveUp_Limb TSL:=============================================================================================================
+
+
+
+// DeleteSelection_Limb TSL:============================================================================================================
+global proc DeleteSelection_Limb()
+{
+	string $selection[0] = `textScrollList -q  -selectItem CH_TSL`;
+	
+	if(size($selection)==1)
+	{
+		string $ConfirmMe = ` confirmDialog -title "Confirm me" -button "Delete" -button "Cancel" -cancelButton "Cancel" -m "Delete selected limb? \nIt will not be available anymore, and you will need to prepare it again at the initial pose" `;
+		if($ConfirmMe == "Cancel")
+		{
+			
+		}else if ($ConfirmMe == "Delete")
+		{
+			if(size($selection)==1)
+			{
+				delete $selection[0];
+				textScrollList -e  -removeItem $selection[0] CH_TSL;
+				// Scan for old data =================================================
+				if(`objExists IK_TO_FK_Limbs`)
+				{
+					string $Chains[] = `listRelatives -c IK_TO_FK_Limbs`;
+					if(size($Chains)== 0)
+					{
+						delete "IK_TO_FK_Limbs";
+					}
+				}
+			}
+			
+		}else{}
+	}else{confirmDialog -title "Confirm me" -m"Please select limb to delete" -b "Ok";}//
+	
+}// End of DeleteSelection_Limb TSL:====================================================================================================
+
+
+
+// LimbData collapse :==================================================================================================================
+global proc LimbData_collapse()
+{
+	window -e   -h 100 IK_FK_Matcher;
+	
+}// End of LimbData collapse :==========================================================================================================
+
+
+
+// IKtoFK_All (All Limbs):==============================================================================================================
+global proc IKtoFK_All()
+{
+	string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message "This will match 'IK to FK' for all available limbs in the current scene. \nBe careful. \nAll limbs must be in 'IK mode', otherwise will cause an error" `;
+	
+	if($Question == "Ok")
+	{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 3;
+		progressBar -e -maxValue $maxV  pBar;
+		progressBar -e  -highlightColor .4 .5 .2  pBar;
+		progressBar -e   -endProgress  pBar;
+		
+		for($limb in $Limbs_available)
+		{
+			
+            
+            textScrollList -e  -si $limb CH_TSL ;
+			progressBar -e -s 1  pBar;
+			assignSelection();
+			progressBar -e -s 1  pBar;
+			IK_to_FK(0);
+			progressBar -e -s 1  pBar;
+		}
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " IK was matched to FK for all limbs " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	}
+	
+			
+}// End of IKtoFK_All (All Limbs):======================================================================================================
+
+
+
+// FKtoIK_All (All Limbs):==============================================================================================================
+global proc FKtoIK_All()
+{
+	string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message "This will match 'FK to IK' for all available limbs in the current scene. \nBe careful. \nAll limbs must be in 'FK mode', otherwise will cause an error" `;
+	
+	if($Question == "Ok")
+	{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 3;
+		progressBar -e -maxValue $maxV  pBar;
+		progressBar -e  -highlightColor .4 .5 .2  pBar;
+		progressBar -e   -endProgress  pBar;
+		for($limb in $Limbs_available)
+		{
+			
+			textScrollList -e  -si $limb CH_TSL ;
+			progressBar -e -s 1  pBar;
+			assignSelection();
+			progressBar -e -s 1  pBar;
+			FK_to_IK(0);
+			progressBar -e -s 1  pBar;
+			
+		}
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " FK was matched to IK for all limbs " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	}
+	
+			
+}// End of FKtoIK_All (All Limbs):======================================================================================================
+
+
+// Search and Replace:==================================================================================================================
+global proc S_and_R()
+{
+	global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    string $IK_value = `textFieldGrp -q -tx IK_value_TXF`;
+    string $FK_value = `textFieldGrp -q -tx FK_value_TXF`;
+
+
+	string $search = `textField -q -tx Search_TXF`;
+	string $replace = `textField -q -tx Replace_TXF`;
+	
+
+	string $ShoulderJoint_new = `substitute $search $ShoulderJoint $replace`;
+	textField -e -tx $ShoulderJoint_new ShoulderJoint_TXF;
+	UnlockAttr(`textField -q -tx ShoulderJoint_TXF`);
+
+	string $ElbowJoint_new = `substitute $search $ElbowJoint $replace`;
+	textField -e -tx $ElbowJoint_new ElbowJointTXF;
+	UnlockAttr(`textField -q -tx ElbowJointTXF`);
+
+	string $WristJoint_new = `substitute $search $WristJoint $replace`;
+	textField -e -tx $WristJoint_new WristJoint_TXF;
+	UnlockAttr(`textField -q -tx WristJoint_TXF`);
+
+	string $FK_Shoulder_Ctrl_new = `substitute $search $FK_Shoulder_Ctrl $replace`;
+	textField -e -tx $FK_Shoulder_Ctrl_new FKShoulderCtrl_TXF;
+	UnlockAttr(`textField -q -tx FKShoulderCtrl_TXF`);
+
+	string $FK_Elbow_Ctrl_new = `substitute $search $FK_Elbow_Ctrl $replace`;
+	textField -e -tx $FK_Elbow_Ctrl_new FKElbowCtrl_TXF;
+	UnlockAttr(`textField -q -tx FKElbowCtrl_TXF`);
+
+	string $FK_Wrist_Ctrl_new = `substitute $search $FK_Wrist_Ctrl $replace`;
+	textField -e -tx $FK_Wrist_Ctrl_new FKWristCtrl_TXF;
+	UnlockAttr(`textField -q -tx FKWristCtrl_TXF`);
+
+	string $PoleVector_Ctrl_new = `substitute $search $PoleVector_Ctrl $replace`;
+	textField -e -tx $PoleVector_Ctrl_new PoleVectorCtrl_TXF;
+	UnlockAttr(`textField -q -tx PoleVectorCtrl_TXF`);
+
+	string $IK_Wrist_Ctrl_new = `substitute $search $IK_Wrist_Ctrl $replace`;
+	textField -e -tx $IK_Wrist_Ctrl_new IKWristCtrl_TXF;
+	UnlockAttr(`textField -q -tx IKWristCtrl_TXF`);
+
+    string $Switch_attr_new = `substitute $search $Switch_attr $replace`;
+	textFieldGrp -e -tx $Switch_attr_new SwitchCtrl_TXF;
+
+    // store renamed switch ctrl:
+    string $buffer[];
+    tokenize $Switch_attr_new "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+	
+
+}//End of Search and Replace:===========================================================================================================
+
+
+// Bake IK to FK:=======================================================================================================================
+global proc Bake_IKtoFK() 
+{
+
+	float $StartFrame =  `textField -q -tx StartFrame_TXF`;
+	float $EndFrame =  `textField -q -tx EndFrame_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+	
+	if($ActivatedLimb == "Empty")
+	{
+		textField -e -bgc 1 .1 .1  ActivatedTXF;
+		confirmDialog -title "Error" -button Ok  -defaultButton Ok  -message "There is no activated limb" ;
+		textField -e -bgc .1 .1 .1  ActivatedTXF;
+	}else{
+		string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message ("This will bake ( IK to FK ) for '" + $ActivatedLimb + "' limb. \nDo you wanna continue?") `;
+		if($Question == "Ok")
+		{
+			// get max value for pBar.
+			int $Step = 0;
+			for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+			{
+				$Step = ($Step + 1);
+				$N++;
+			}
+			progressBar -e -maxValue $Step  pBar;
+			progressBar -e -minValue 0  pBar;
+            progressBar -e -ii off  pBar;
+
+					
+			// Baking.
+			cycleCheck -e off;
+			progressWindow   // Create progressWindow.
+				-title ("Bake IK to FK")
+				-maxValue $Step
+				-minValue 0
+				-isInterruptable true;
+
+			for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+			{
+				if(`progressWindow -query -isCancelled`) 
+				{
+					break;
+				}else{
+					progressBar -e -s 1  pBar;
+					progressWindow -e -s 1 -status ("Baking: " +  $ActivatedLimb );
+				}
+
+                IK_to_FK(1);
+				currentTime  $N;
+				IK_to_FK(1);
+				//progressBar -e -s 1  pBar;
+
+
+				$N++;
+			}
+			progressBar -e   -endProgress  pBar;
+			progressWindow -endProgress;
+
+			cycleCheck -e on;
+
+			print ("Bake (IK to FK) :  Done");
+		}
+
+	}
+	
+	
+}//End of Bake IK to FK:================================================================================================================
+
+
+// Bake FK to IK:=======================================================================================================================
+global proc Bake_FKtoIK() 
+{
+
+	float $StartFrame =  `textField -q -tx StartFrame_TXF`;
+	float $EndFrame =  `textField -q -tx EndFrame_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+	
+	if($ActivatedLimb == "Empty")
+	{
+		textField -e -bgc 1 .1 .1  ActivatedTXF;
+		confirmDialog -title "Error" -button Ok  -defaultButton Ok  -message "There is no activated limb" ;
+		textField -e -bgc .1 .1 .1  ActivatedTXF;
+	}else{
+		string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message ("This will bake ( FK to IK ) for '" + $ActivatedLimb + "' limb. \nDo you wanna continue?") `;
+		if($Question == "Ok")
+		{
+			// get max value for pBar.
+			int $Step = 0;
+			for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+			{
+				$Step = ($Step + 1);
+				$N++;
+			}
+			progressBar -e -maxValue $Step  pBar;
+			progressBar -e -minValue 0  pBar;
+
+
+			// Baking.
+			cycleCheck -e off;
+			progressWindow   // Create progressWindow.
+				-title ("Bake FK to IK")
+				-maxValue $Step
+				-minValue 0
+				-isInterruptable true;
+
+
+			for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+			{
+				if(`progressWindow -query -isCancelled`) 
+				{
+					break;
+				}else{
+					progressBar -e -s 1  pBar;
+					progressWindow -e -s 1 -status ("Baking: " +  $ActivatedLimb );
+				}
+				FK_to_IK(1);
+				currentTime $N ;
+				FK_to_IK(1);
+				//progressBar -e -s 1  pBar;
+				$N++;
+			}
+			progressBar -e   -endProgress  pBar;
+			progressWindow -endProgress;
+
+			cycleCheck -e on;
+
+			print ("Bake (FK to IK) :  Done");
+		}
+
+	}
+
+	
+}//End of Bake FK to IK:================================================================================================================
+
+
+
+
+// Check for old data:==================================================================================================================
+if(`objExists "IK_TO_FK_temp"`)
+{
+	
+	confirmDialog -t"IK-FK Match" -m "this scene contains old data of the free version of IK-FK match, It's no longer work with the new version. \nPlease re-setup your limb data at the initial pose." -b "OK" ;
+	string $confirmToDelete =  `confirmDialog -t"IK-FK Match | Deleting old data" -m "Do you want to delete old data of 'IK-FK Match' in this scene?" -b "Yes" -b "No Thanks"`;
+	if($confirmToDelete == "Yes")
+	{
+		delete "IK_TO_FK_temp";
+		print "Old data has been deleted successfully.";
+	}
+}// End of Check for old data:==========================================================================================================
+
+
+
+// Dock UI:=============================================================================================================================
+global proc dockWindow()
+{
+    global string $IKFKWindow ;
+
+	if(`dockControl -exists  "dockWindowsUI"`)
+	{
+		deleteUI "dockWindowsUI";
+	}
+    
+	dockControl -l "IK-FK Match v.2.33"  -area "left" -moveable on -content $IKFKWindow  -allowedArea "all"  dockWindowsUI;
+	//button -e -enable off dockWindowButton;
+	button -e -vis off dockWindowButton;
+}// End of Dock UI:=====================================================================================================================
+
+
+
+
+// Bake  ( FK to IK ):==================================================================================================================
+global proc BakeAll_FKtoIK()
+{
+	string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message "This will match and bake 'FK to IK' for all available limbs in the current scene. \nBe careful. \nAll limbs must be in 'FK mode', otherwise will cause an error" `;
+	
+	if($Question == "Ok")
+	{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 3;
+
+		cycleCheck -e off;
+
+		for($limb in $Limbs_available)
+		{
+			
+			textScrollList -e  -si $limb CH_TSL ;
+			assignSelection();
+			Bake_FKtoIK_auto();
+			
+		}
+
+		cycleCheck -e on;
+
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " FK was matched and baked to IK for all limbs " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	}
+	
+			
+}// End of Bake ( FK to IK ):===========================================================================================================
+
+
+// Bake ( IK to FK ):===================================================================================================================
+global proc BakeAll_IKtoFK()
+{
+	string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message "This will match and bake 'IK to FK' for all available limbs in the current scene. \nBe careful. \nAll limbs must be in 'IK mode', otherwise will cause an error" `;
+	
+	if($Question == "Ok")
+	{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 3;
+		
+		cycleCheck -e off;
+
+		for($limb in $Limbs_available)
+		{
+			if(`progressWindow -query -isCancelled`) 
+			{
+				break;
+			}
+			textScrollList -e  -si $limb CH_TSL ;
+			assignSelection();
+			Bake_IKtoFK_auto();
+			
+		}
+		
+		cycleCheck -e on;
+
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " IK was matched and baked to FK for all limbs " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	}
+	
+			
+}// End of Bake All ( IK to FK ):=======================================================================================================
+
+
+
+// Bake All ( FK to IK ) :==============================================================================================================
+global proc Bake_FKtoIK_auto() 
+{
+
+	float $StartFrame =  `textField -q -tx StartFrame_TXF`;
+	float $EndFrame =  `textField -q -tx EndFrame_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+	
+	
+	// get max value for pBar.
+	int $Step = 0;
+	for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+	{
+		$Step = ($Step + 1);
+		$N++;
+	}
+	progressBar -e -maxValue $Step  pBar;
+	progressBar -e -minValue 0  pBar;
+
+
+	// Baking.
+	cycleCheck -e off;
+	progressWindow   // Create progressWindow.
+		-title ("Bake FK to IK")
+		-maxValue $Step
+		-minValue 0
+		-isInterruptable true;
+
+
+	for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+	{
+		if(`progressWindow -query -isCancelled`) 
+		{
+			break;
+		}else{
+			progressBar -e -s 1  pBar;
+			progressWindow -e -s 1 -status ("Baking: " +  $ActivatedLimb );
+		}
+		FK_to_IK(1);
+		currentTime $N ;
+		FK_to_IK(1);
+		//progressBar -e -s 1  pBar;
+		$N++;
+	}
+	progressBar -e   -endProgress  pBar;
+	progressWindow -endProgress;
+	
+	cycleCheck -e on;
+	
+	print ("Bake (FK to IK) :  Done");
+
+	
+}// End of Bake All ( FK to IK ) :======================================================================================================
+
+
+
+// Bake All ( IK to FK ) :==============================================================================================================
+global proc Bake_IKtoFK_auto() 
+{
+
+	float $StartFrame =  `textField -q -tx StartFrame_TXF`;
+	float $EndFrame =  `textField -q -tx EndFrame_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+	
+	
+	// get max value for pBar.
+	int $Step = 0;
+	for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+	{
+		$Step = ($Step + 1);
+		$N++;
+	}
+	progressBar -e -maxValue $Step  pBar;
+	progressBar -e -minValue 0  pBar;
+
+
+	// Baking.
+	cycleCheck -e off;
+	progressWindow   // Create progressWindow.
+		-title ("Bake IK to FK")
+		-maxValue $Step
+		-minValue 0
+		-isInterruptable true;
+
+
+	for($N=$StartFrame; $N <= $EndFrame; $N=$N)
+	{
+		if(`progressWindow -query -isCancelled`) 
+		{
+			break;
+		}else{
+			progressBar -e -s 1  pBar;
+			progressWindow -e -s 1 -status ("Baking: " +  $ActivatedLimb );
+		}
+		IK_to_FK(1);
+		currentTime $N ;
+		IK_to_FK(1);
+		//progressBar -e -s 1  pBar;
+		$N++;
+	}
+	progressBar -e   -endProgress  pBar;
+	progressWindow -endProgress;
+	
+	cycleCheck -e on;
+
+	print ("Bake (IK to FK) :  Done");
+
+	
+}// End of Bake All ( IK to FK ) :======================================================================================================
+
+
+
+// Open new window for namespace :======================================================================================================
+global proc checkboxPrompt()
+{
+    string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+    
+    // Get the dialog's formLayout.
+    //
+    global string $chosen_name;
+
+    string $form = `setParent -q`;
+
+    // layoutDialog's are not resizable, so hard code a size here,
+    // to make sure all UI elements are visible.
+    //
+
+    columnLayout 
+        -rowSpacing 5 
+        -width 400  
+        -columnAttach "both" 7 
+        -h 165
+        -adj true 
+        $form;
+    text -h 30  -l "\nThere is more than object matches name.\n";
+    separator -style "in" ;
+    text -h 20 -align "left" -font "boldLabelFont" -l ("Activated Limb : " + $ActivatedLimb );
+	text -h 20 -align "left"  -l "Select the right one and click 'Continue'.";
+    separator -style "in" ;
+    optionMenu -label "Availables " -changeCommand "$chosen_name = \"#1\"" Namespaces; // "print #1"
+    
+    separator -style "in" ;
+    //button  -l "Continue"  /*-c " $chosen_name = `optionMenu -query -v Namespaces`; deleteUI Namespace_found;"*/ dockWindowButton;
+    button  -l "Continue"  -c "$chosen_name = `optionMenu -query -v Namespaces`; layoutDialog -dismiss \"Continue\";" dockWindowButton;
+
+    
+    string $All_Ctrl[] = `ls -type {"transform" , "joint"}`;
+    string $Ctrls_with_same_name[];
+    for($Ctrl in $All_Ctrl)
+    {
+        string $spliters[];
+        tokenize  $Ctrl ":" $spliters; // Remove namespace:
+        if($spliters[size($spliters)-1] == $FK_Shoulder_Ctrl )
+        {$Ctrls_with_same_name[size($Ctrls_with_same_name)] = $Ctrl;}
+    }
+    for($Ctrl in $Ctrls_with_same_name)
+    {
+        menuItem -label $Ctrl;
+    }
+
+}// End of Open new window for namespace :==============================================================================================
+
+
+
+// Rebuild Activated Limb :=============================================================================================================
+global proc Rebuild_Activated_Limb()
+{
+    global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    string $IK_value = `textFieldGrp -q -tx IK_value_TXF`;
+    string $FK_value = `textFieldGrp -q -tx FK_value_TXF`;
+	string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+
+	// Check for error:
+	string $All_IK_FKtransform[] = `ls -type "transform"  "*:IK_TO_FK_Limbs*"`;
+	for($item in $All_IK_FKtransform)
+	{
+		string $Chains[] = `listRelatives -c $item`;
+		for($chain in $Chains) if($chain == $ActivatedLimb) error -noContext "The limb you have selected is a built-in limb, We can't rebuild it, please go to the rig file and try again.";
+	}
+
+
+
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+
+	// fill limb data:
+	string $All_Ctrl[] = `ls -type {"transform" , "joint"}`;
+
+    string $Ctrls_with_same_name[];
+    for($Ctrl in $All_Ctrl)
+    {
+        string $spliters[];
+        tokenize  $Ctrl ":" $spliters; // Remove namespace:
+        if($spliters[size($spliters)-1] == $FK_Shoulder_Ctrl)
+        {$Ctrls_with_same_name[size($Ctrls_with_same_name)] = $Ctrl;}
+    }
+
+    if(size($Ctrls_with_same_name) == 0)
+    {
+        // there is no Ctrl:
+    }else if(size($Ctrls_with_same_name) == 1)
+    {
+        //there is only one Ctrl:
+        for($Ctrl in $All_Ctrl)
+        {
+            string $spliters[];
+            tokenize  $Ctrl ":" $spliters; // Remove namespace:
+        
+            if($spliters[size($spliters)-1] == $FK_Shoulder_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKShoulderCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $FK_Elbow_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKElbowCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $FK_Wrist_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKWristCtrl_TXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $PoleVector_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl PoleVectorCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $IK_Wrist_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl IKWristCtrl_TXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $ShoulderJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl ShoulderJoint_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $ElbowJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl ElbowJointTXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $WristJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl WristJoint_TXF;
+            }
+
+            if($spliters[size($spliters)-1] == $Switch_Ctrl_name)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textFieldGrp -e -tx ($Ctrl + "." + $Switch_attr_only) SwitchCtrl_TXF;
+            }
+        
+        }
+
+    }else{
+        // There is more than object matches name:
+        // Open new window for namespace:
+		string $Namespace_Dialog = `layoutDialog -t "Namespace found" -ui "checkboxPrompt"`;
+		if($Namespace_Dialog == "dismiss") {error -n "The rebuilding job was canceled! ";}
+		global string $chosen_name;
+		string $CtrlName = IK_FK_Remove_nameSpace($chosen_name); // Remove namespace:
+		string $NameSpace_only = `substitute $CtrlName $chosen_name ""`;
+        
+        if(`objExists ($NameSpace_only + $FK_Shoulder_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $FK_Shoulder_Ctrl) FKShoulderCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only +  $FK_Elbow_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only +  $FK_Elbow_Ctrl) FKElbowCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $FK_Wrist_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $FK_Wrist_Ctrl) FKWristCtrl_TXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $PoleVector_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $PoleVector_Ctrl) PoleVectorCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $IK_Wrist_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $IK_Wrist_Ctrl) IKWristCtrl_TXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $ShoulderJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $ShoulderJoint) ShoulderJoint_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $ElbowJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $ElbowJoint) ElbowJointTXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $WristJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $WristJoint) WristJoint_TXF;
+        }
+
+        if(`objExists ($NameSpace_only + $Switch_Ctrl_name)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textFieldGrp -e -tx ($NameSpace_only + "." + $Switch_attr_only) SwitchCtrl_TXF;
+        }
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+	// Prepare:
+	if($ActivatedLimb != "Empty")
+	{
+		global string $Switch_Ctrl_name;
+        string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+        string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+        string $WristJoint = `textField -q -tx WristJoint_TXF`;
+        string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+        string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+        string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+        string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+        string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;	
+        string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+        string $IK_value = `textFieldGrp -q -tx IK_value_TXF`;
+        string $FK_value = `textFieldGrp -q -tx FK_value_TXF`;
+		string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+        // Get switch ctrl name:
+        string $buffer[];
+        tokenize $Switch_attr "." $buffer;
+        $Switch_Ctrl_name = $buffer[0];
+        string $Switch_attr_only = $buffer[1];
+		
+		// DeleteSelection_Limb:----------------------------------------------------------
+		string $selection[0] = `textScrollList -q  -selectItem CH_TSL`;
+		
+	
+		if(size($selection)==1)
+		{
+			
+			if(size($selection)==1)
+			{
+				delete $selection[0];
+				textScrollList -e  -removeItem $selection[0] CH_TSL;
+				// Scan for old data =================================================
+				if(`objExists IK_TO_FK_Limbs`)
+				{
+					string $Chains[] = `listRelatives -c IK_TO_FK_Limbs`;
+					if(size($Chains)== 0)
+					{
+						delete "IK_TO_FK_Limbs";
+					}
+				}
+			}
+				
+		}// End of DeleteSelection_Limb:----------------------------------------------------------
+
+
+
+
+
+		if(`objExists $ActivatedLimb`){delete $ActivatedLimb;}
+		
+		
+
+		// Prepare with xform:
+		// get xform:
+		$Rshoulder_rotate = ` xform -q -ws -ro $ShoulderJoint `;
+		$Rshoulder_translate = ` xform -q -ws -t $ShoulderJoint `;
+
+		$R_elbow_rotate = ` xform -q -ws -ro $ElbowJoint `;
+		$R_elbow_translate = ` xform -q -ws -t $ElbowJoint `;
+
+		$R_wrist_rotate = ` xform -q -ws -ro $WristJoint `;
+		$R_wrist_translate = ` xform -q -ws -t $WristJoint `;
+
+
+		// get rotation order"
+		$Shoulder_jnt_rotateOrder =  `getAttr ($ShoulderJoint + ".rotateOrder")` ;
+		$Elbow_jnt_rotateOrder =  `getAttr ($ElbowJoint + ".rotateOrder")` ;
+		$Wrist_jnt_rotateOrder =  `getAttr ($WristJoint + ".rotateOrder")` ;
+
+
+	
+		
+		// Create Elbow_Loc.
+		select -cl;
+		string $Elbow_Jnt =  `joint -n ($FK_Elbow_Ctrl + "_WS_Jnt")`;
+		string $Elbow_Loc[0] = ` spaceLocator -name ($FK_Elbow_Ctrl + "_WS") -p 0 0 0`;
+		xform -ws -ro $R_elbow_rotate[0] $R_elbow_rotate[1] $R_elbow_rotate[2] $Elbow_Jnt;
+		xform -ws -t $R_elbow_translate[0] $R_elbow_translate[1] $R_elbow_translate[2] $Elbow_Jnt;
+
+		parent $Elbow_Loc[0] $Elbow_Jnt;
+		setAttr ($Elbow_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Elbow_Loc[0] + ".rotate") 0 0 0;
+        //delete `orientConstraint -offset 0 0 0 -weight 1 $FK_Elbow_Ctrl $Elbow_Loc[0]` ;
+
+		
+		// Create Wrist_Loc.
+		select -cl;
+		string $Wrist_Jnt = `joint -n ($FK_Wrist_Ctrl + "_WS_Jnt") -p 0 0 0`;
+		string $Wrist_Loc[0] = ` spaceLocator -name ($FK_Wrist_Ctrl + "_WS") -p 0 0 0`;
+		//xform -ws -ro $R_wrist_rotate[0] $R_wrist_rotate[1] $R_wrist_rotate[2] $Wrist_Jnt;
+		//xform -ws -t $R_wrist_translate[0] $R_wrist_translate[1] $R_wrist_translate[2] $Wrist_Jnt;
+		delete `parentConstraint  -weight 1 $FK_Wrist_Ctrl $Wrist_Jnt` ;
+		
+        parent $Wrist_Loc[0] $Wrist_Jnt;
+		setAttr ($Wrist_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Wrist_Loc[0] + ".rotate") 0 0 0;
+		delete `orientConstraint -offset 0 0 0 -weight 1 $IK_Wrist_Ctrl $Wrist_Loc` ;
+		
+
+
+		// Create Shoulder_Loc.
+		select -cl;
+		string $Shoulder_Jnt = `joint -n ($ShoulderJoint + "_WS_Jnt") -p 0 0 0`;
+		string $Shoulder_Loc[0] = ` spaceLocator -name ($ShoulderJoint + "_WS") -p 0 0 0`;
+        setAttr ($Shoulder_Jnt + ".rotateOrder") $Shoulder_jnt_rotateOrder;
+		xform -ws -ro $Rshoulder_rotate[0] $Rshoulder_rotate[1] $Rshoulder_rotate[2] $Shoulder_Jnt;
+		xform -ws -t $Rshoulder_translate[0] $Rshoulder_translate[1] $Rshoulder_translate[2] $Shoulder_Jnt;
+		
+		parent $Shoulder_Loc[0] $Shoulder_Jnt;
+		setAttr ($Shoulder_Loc[0] + ".translate") 0 0 0;
+		setAttr ($Shoulder_Loc[0] + ".rotate") 0 0 0;
+        delete `orientConstraint -offset 0 0 0 -weight 1 $ShoulderJoint $Shoulder_Loc[0]` ;
+		
+
+
+		// Create ElbowToFK_Loc.
+		select -cl;
+		string $ElbowToFK_Jnt = `joint -n ($ElbowJoint + "_WS_Jnt") -p 0 0 0`;
+		string $ElbowToFK_Loc[0] = ` spaceLocator -name ($ElbowJoint + "_WS") -p 0 0 0`;
+        setAttr ($ElbowToFK_Jnt + ".rotateOrder") $Elbow_jnt_rotateOrder;
+		xform -ws -ro $R_elbow_rotate[0] $R_elbow_rotate[1] $R_elbow_rotate[2] $ElbowToFK_Jnt;
+		xform -ws -t $R_elbow_translate[0] $R_elbow_translate[1] $R_elbow_translate[2] $ElbowToFK_Jnt;
+		
+		parent $ElbowToFK_Loc[0] $ElbowToFK_Jnt;
+		setAttr ($ElbowToFK_Loc[0] + ".translate") 0 0 0;
+		setAttr ($ElbowToFK_Loc[0] + ".rotate") 0 0 0;
+		
+
+
+
+		// PoleVector_Loc.
+		string $PoleVector_Loc[0] = ` spaceLocator -name ($PoleVector_Ctrl + "_WS") -p 0 0 0`;
+		string $temp_pointConstraint[] = `pointConstraint -offset 0 0 0 -weight 1 $PoleVector_Ctrl $PoleVector_Loc` ;
+		delete $temp_pointConstraint;
+		parent $PoleVector_Loc $ElbowToFK_Loc;	
+
+
+
+
+		// Create WristToFK_Loc.
+		select -cl;
+		string $WristToFK_Jnt = `joint -n ($WristJoint + "_WS_Jnt") -p 0 0 0`;
+		string $WristToFK_Loc[0] = ` spaceLocator -name ($WristJoint + "_WS") -p 0 0 0`;
+        setAttr ($WristToFK_Jnt + ".rotateOrder") $Wrist_jnt_rotateOrder;
+		xform -ws -ro $R_wrist_rotate[0] $R_wrist_rotate[1] $R_wrist_rotate[2] $WristToFK_Jnt;
+		xform -ws -t $R_wrist_translate[0] $R_wrist_translate[1] $R_wrist_translate[2] $WristToFK_Jnt;
+		
+		parent $WristToFK_Loc[0] $WristToFK_Jnt;
+		setAttr ($WristToFK_Loc[0] + ".translate") 0 0 0;
+		setAttr ($WristToFK_Loc[0] + ".rotate") 0 0 0;
+        delete `orientConstraint -offset 0 0 0 -weight 1 $FK_Wrist_Ctrl $WristToFK_Loc[0]` ;
+
+
+		
+		// Group all temp locators.
+		group -n $ActivatedLimb $Elbow_Jnt $Wrist_Jnt $Shoulder_Jnt $ElbowToFK_Jnt $WristToFK_Jnt ;
+		setAttr ($ActivatedLimb + ".visibility") 0;
+		if(`objExists "IK_TO_FK_Limbs"`)
+		{
+			parent $ActivatedLimb "IK_TO_FK_Limbs";
+		}else{
+			group -n "IK_TO_FK_Limbs" $ActivatedLimb;
+		}
+		
+	
+		
+		// Save work.
+		addAttr -ln "Shoulder_Joint"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".Shoulder_Joint") $ShoulderJoint;
+		
+		addAttr -ln "Elbow_Joint"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".Elbow_Joint") $ElbowJoint;
+		
+		addAttr -ln "Wrist_Joint"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".Wrist_Joint") $WristJoint;
+		
+		addAttr -ln "FK_Shoulder_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".FK_Shoulder_Ctrl") $FK_Shoulder_Ctrl;
+		
+		addAttr -ln "FK_Elbow_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".FK_Elbow_Ctrl") $FK_Elbow_Ctrl;
+		
+		addAttr -ln "FK_Wrist_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".FK_Wrist_Ctrl") $FK_Wrist_Ctrl;
+		
+		addAttr -ln "PoleVector_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".PoleVector_Ctrl") $PoleVector_Ctrl;
+		
+		addAttr -ln "IK_Wrist_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".IK_Wrist_Ctrl") $IK_Wrist_Ctrl;
+
+        addAttr -ln "Switch_Ctrl"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".Switch_Ctrl") $Switch_Ctrl_name;
+		
+        addAttr -ln "Switch_attr"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".Switch_attr") $Switch_attr;
+    
+        addAttr -ln "IK_Value"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".IK_Value") $IK_value;
+
+        addAttr -ln "FK_Value"  -dt "string"  $ActivatedLimb;
+		setAttr -type "string" ($ActivatedLimb + ".FK_Value") $FK_value;
+	
+	
+		// Add chain to tist:
+		textScrollList -e  -append  $ActivatedLimb  CH_TSL;
+	}//
+
+
+
+}// End of Rebuild Activated Limb :=====================================================================================================
+
+
+
+
+
+// Rebuild All :========================================================================================================================
+global proc Rebuild_All()
+{
+	//string $Question = ` confirmDialog -title "be careful" -button Ok -button Cancel -defaultButton Ok -cancelButton Cancel -message "This will match and bake 'IK to FK' for all available limbs in the current scene. \nBe careful. \nAll limbs must be in 'IK mode', otherwise will cause an error" `;
+	
+	//if($Question == "Ok")
+	//{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 4;
+		
+		if(size($Limbs_available) == 0)
+		{
+			error -n "There is no data to rebuild .";
+		}
+		
+		progressBar -e -maxValue $maxV  pBar;
+		progressBar -e   -endProgress  pBar;
+		for($limb in $Limbs_available)
+		{
+			progressBar -e -s 1 pBar;
+			textScrollList -e  -si $limb CH_TSL ;
+			progressBar -e -s 1 pBar;
+			assignSelection();
+			progressBar -e -s 1 pBar;
+			Rebuild_Activated_Limb();
+			progressBar -e -s 1 pBar;
+			refresh -f;
+			
+		}
+
+		progressBar -e   -endProgress  pBar;
+
+		ClearF();
+
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " All limbs has been rebuilt " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	//}
+}// End of Rebuild All :================================================================================================================
+
+
+
+
+// Update Activated Limb :=============================================================================================================
+global proc Update_Activated_Limb()
+{
+    global string $Switch_Ctrl_name;
+    string $ShoulderJoint = `textField -q -tx ShoulderJoint_TXF`;
+	string $ElbowJoint = `textField -q -tx ElbowJointTXF`;
+	string $WristJoint = `textField -q -tx WristJoint_TXF`;
+	string $FK_Shoulder_Ctrl = `textField -q -tx FKShoulderCtrl_TXF`;
+	string $FK_Elbow_Ctrl = `textField -q -tx FKElbowCtrl_TXF`;
+	string $FK_Wrist_Ctrl = `textField -q -tx FKWristCtrl_TXF`;
+	string $PoleVector_Ctrl = `textField -q -tx PoleVectorCtrl_TXF`;
+	string $IK_Wrist_Ctrl = `textField -q -tx IKWristCtrl_TXF`;	
+    string $Switch_attr = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+    string $IK_value = `textFieldGrp -q -tx IK_value_TXF`;
+    string $FK_value = `textFieldGrp -q -tx FK_value_TXF`;
+    string $ActivatedLimb = `textField -q -text  ActivatedTXF`;
+
+	// Check for error:
+	string $All_IK_FKtransform[] = `ls -type "transform"  "*:IK_TO_FK_Limbs*"`;
+	for($item in $All_IK_FKtransform)
+	{
+		string $Chains[] = `listRelatives -c $item`;
+		for($chain in $Chains) if($chain == $ActivatedLimb) error -noContext "The limb you have selected is a built-in limb, We can't update it, please go to the rig file and try again.";
+	}
+
+
+    // Get switch ctrl name:
+    string $buffer[];
+    tokenize $Switch_attr "." $buffer;
+    $Switch_Ctrl_name = $buffer[0];
+    string $Switch_attr_only = $buffer[1];
+
+	// fill limb data:
+	string $All_Ctrl[] = `ls -type {"transform" , "joint"}`;
+
+    string $Ctrls_with_same_name[];
+    for($Ctrl in $All_Ctrl)
+    {
+        string $spliters[];
+        tokenize  $Ctrl ":" $spliters; // Remove namespace:
+        if($spliters[size($spliters)-1] == $FK_Shoulder_Ctrl)
+        {$Ctrls_with_same_name[size($Ctrls_with_same_name)] = $Ctrl;}
+    }
+
+    if(size($Ctrls_with_same_name) == 0)
+    {
+        // there is no Ctrl:
+    }else if(size($Ctrls_with_same_name) == 1)
+    {
+        //there is only one Ctrl:
+        for($Ctrl in $All_Ctrl)
+        {
+            string $spliters[];
+            tokenize  $Ctrl ":" $spliters; // Remove namespace:
+        
+            if($spliters[size($spliters)-1] == $FK_Shoulder_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKShoulderCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $FK_Elbow_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKElbowCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $FK_Wrist_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl FKWristCtrl_TXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $PoleVector_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl PoleVectorCtrl_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $IK_Wrist_Ctrl)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl IKWristCtrl_TXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $ShoulderJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl ShoulderJoint_TXF;
+            }
+        
+            if($spliters[size($spliters)-1] == $ElbowJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl ElbowJointTXF;
+            }
+            
+            if($spliters[size($spliters)-1] == $WristJoint)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textField -e -tx $Ctrl WristJoint_TXF;
+            }
+
+            if($spliters[size($spliters)-1] == $Switch_Ctrl_name)
+            {
+                //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+                textFieldGrp -e -tx ($Ctrl + "." + $Switch_attr_only) SwitchCtrl_TXF;
+            }
+        
+        }
+
+    }else{
+        // There is more than object matches name:
+        // Open new window for namespace:
+		string $Namespace_Dialog = `layoutDialog -t "Namespace found" -ui "checkboxPrompt"`;
+		if($Namespace_Dialog == "dismiss") {error -n "The rebuilding job was canceled! ";}
+		global string $chosen_name;
+		string $CtrlName = IK_FK_Remove_nameSpace($chosen_name); // Remove namespace:
+		string $NameSpace_only = `substitute $CtrlName $chosen_name ""`;
+        
+        if(`objExists ($NameSpace_only + $FK_Shoulder_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $FK_Shoulder_Ctrl) FKShoulderCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only +  $FK_Elbow_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only +  $FK_Elbow_Ctrl) FKElbowCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $FK_Wrist_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $FK_Wrist_Ctrl) FKWristCtrl_TXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $PoleVector_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $PoleVector_Ctrl) PoleVectorCtrl_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $IK_Wrist_Ctrl)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $IK_Wrist_Ctrl) IKWristCtrl_TXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $ShoulderJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $ShoulderJoint) ShoulderJoint_TXF;
+        }
+    
+        if(`objExists ($NameSpace_only + $ElbowJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $ElbowJoint) ElbowJointTXF;
+        }
+        
+        if(`objExists ($NameSpace_only + $WristJoint)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textField -e -tx ($NameSpace_only + $WristJoint) WristJoint_TXF;
+        }
+
+        if(`objExists ($NameSpace_only + $Switch_Ctrl_name)`)
+        {
+            //print ("The ctrl name is : " + $spliters[size($spliters)-1] + "  >>  ");
+            textFieldGrp -e -tx ($NameSpace_only + "." + $Switch_attr_only) SwitchCtrl_TXF;
+        }
+
+    }
+
+
+
+
+
+	// Prepare:
+	if($ActivatedLimb != "Empty")
+	{
+		global string $Switch_Ctrl_name;
+        string $ShoulderJoint_new = `textField -q -tx ShoulderJoint_TXF`;
+		string $ElbowJoint_new = `textField -q -tx ElbowJointTXF`;
+		string $WristJoint_new = `textField -q -tx WristJoint_TXF`;
+		string $FK_Shoulder_Ctrl_new = `textField -q -tx FKShoulderCtrl_TXF`;
+		string $FK_Elbow_Ctrl_new = `textField -q -tx FKElbowCtrl_TXF`;
+		string $FK_Wrist_Ctrl_new = `textField -q -tx FKWristCtrl_TXF`;
+		string $PoleVector_Ctrl_new = `textField -q -tx PoleVectorCtrl_TXF`;
+		string $IK_Wrist_Ctrl_new = `textField -q -tx IKWristCtrl_TXF`;
+		string $ActivatedLimb_new = `textField -q -text  ActivatedTXF`;
+        string $Switch_attr_new = `textFieldGrp -q -tx SwitchCtrl_TXF`;
+        string $IK_value_new = `textFieldGrp -q -tx IK_value_TXF`;
+        string $FK_value_new = `textFieldGrp -q -tx FK_value_TXF`;
+		
+		string $selection[0] = `textScrollList -q  -selectItem CH_TSL`;
+
+        // Get switch ctrl name:
+        string $buffer[];
+        tokenize $Switch_attr_new "." $buffer;
+        $Switch_Ctrl_name = $buffer[0];
+        string $Switch_attr_only = $buffer[1];
+		
+	
+		
+		// Rename Elbow_Loc.
+		select -cl;
+		rename ($ActivatedLimb + "|" + $FK_Elbow_Ctrl + "_WS_Jnt") ($FK_Elbow_Ctrl_new + "_WS_Jnt");
+		rename ($FK_Elbow_Ctrl_new  + "_WS_Jnt|" + $FK_Elbow_Ctrl + "_WS") ($FK_Elbow_Ctrl_new + "_WS");
+
+		
+		// Rename Wrist_Loc.
+		select -cl;
+		rename ($ActivatedLimb + "|" + $FK_Wrist_Ctrl + "_WS_Jnt") ($FK_Wrist_Ctrl_new + "_WS_Jnt");
+		rename ($FK_Wrist_Ctrl_new + "_WS_Jnt|" + $FK_Wrist_Ctrl + "_WS") ($FK_Wrist_Ctrl_new + "_WS");
+		
+
+
+		// Rename Shoulder_Loc.
+		select -cl;
+		rename ($ActivatedLimb + "|" + $ShoulderJoint + "_WS_Jnt") ($ShoulderJoint_new + "_WS_Jnt");
+		rename ($ShoulderJoint_new + "_WS_Jnt|" + $ShoulderJoint + "_WS") ($ShoulderJoint_new + "_WS");
+		
+
+
+		// Rename ElbowToFK_Loc.
+		select -cl;
+		rename ($ActivatedLimb + "|" + $ElbowJoint + "_WS_Jnt") ($ElbowJoint_new + "_WS_Jnt");
+		rename ($ElbowJoint_new + "_WS_Jnt|" + $ElbowJoint + "_WS") ($ElbowJoint_new + "_WS");
+		
+
+
+
+		// Rename PoleVector_Loc.
+		rename ($ElbowJoint_new + "_WS_Jnt|" + $ElbowJoint_new + "_WS|" + $PoleVector_Ctrl + "_WS") ($PoleVector_Ctrl_new + "_WS");
+
+
+
+
+		// Rename WristToFK_Loc.
+		select -cl;
+		rename ($ActivatedLimb + "|" + $WristJoint + "_WS_Jnt") ($WristJoint_new + "_WS_Jnt");
+		rename ($WristJoint_new + "_WS_Jnt|" + $WristJoint + "_WS") ($WristJoint_new + "_WS");
+		
+	
+		
+		// Save work.
+		setAttr -type "string" ($ActivatedLimb + ".Shoulder_Joint") $ShoulderJoint_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".Elbow_Joint") $ElbowJoint_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".Wrist_Joint") $WristJoint_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".FK_Shoulder_Ctrl") $FK_Shoulder_Ctrl_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".FK_Elbow_Ctrl") $FK_Elbow_Ctrl_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".FK_Wrist_Ctrl") $FK_Wrist_Ctrl_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".PoleVector_Ctrl") $PoleVector_Ctrl_new;
+		
+		setAttr -type "string" ($ActivatedLimb + ".IK_Wrist_Ctrl") $IK_Wrist_Ctrl_new;
+
+        setAttr -type "string" ($ActivatedLimb + ".Switch_Ctrl") $Switch_Ctrl_name;
+
+        setAttr -type "string" ($ActivatedLimb + ".Switch_attr") $Switch_attr_new;
+	
+	
+	}//
+
+
+
+}// End of Update Activated Limb :=====================================================================================================
+
+
+
+
+// Update All :========================================================================================================================
+global proc Update_All()
+{
+	
+	//if($Question == "Ok")
+	//{
+		string $Limbs_available[] = ` textScrollList -q -ai CH_TSL `;
+		int $maxV = size($Limbs_available) * 4;
+		
+		if(size($Limbs_available) == 0)
+		{
+			error -n "There is no data to rebuild .";
+		}
+		
+		progressBar -e -maxValue $maxV  pBar;
+		progressBar -e   -endProgress  pBar;
+		for($limb in $Limbs_available)
+		{
+			progressBar -e -s 1 pBar;
+			textScrollList -e  -si $limb CH_TSL ;
+			progressBar -e -s 1 pBar;
+			assignSelection();
+			progressBar -e -s 1 pBar;
+			Update_Activated_Limb();
+			progressBar -e -s 1 pBar;
+			refresh -f;
+			
+		}
+
+		progressBar -e   -endProgress  pBar;
+
+		ClearF();
+
+		inViewMessage 
+			-smg ("<font color=\"#9CFF33\">" +  " All limbs has been Updated " ) 
+			-pos topCenter -bkc 0x00000000  
+			-fade  
+			-fadeOutTime 400 
+			-fadeStayTime 3000  
+			-fontSize 14;
+	//}
+}// End of Update All :================================================================================================================
+
+
+
+
+
+// Import data :========================================================================================================================
+global proc Import_data()
+{
+	string $FileBrowse[] = `fileDialog2 -fileFilter "Maya Files (*.ma *.mb)" -dialogStyle 2 -fileMode 1 -okCaption "Import" -caption "Import Data"`;
+
+	if(size($FileBrowse) != 0)
+	{
+		string $Imported[] = ` file -import -type "mayaBinary" -returnNewNodes  -ignoreVersion -ra true -mergeNamespacesOnClash true -namespace ":" -options "v=0;"  -pr  -importTimeRange "combine" $FileBrowse[0] `;
+
+		string $IK_FK_data[] = `listRelatives -children $Imported[0]`;
+
+		select -r $Imported[0];
+		string $sel[0] = `ls -sl`;
+		if($sel[0] == "IK_TO_FK_Limbs")
+		{
+			print "Data sucssesfuly imported";
+		}else{
+			parent $IK_FK_data "IK_TO_FK_Limbs";
+			delete $Imported[0];
+		}
+		ClearF();
+
+	}
+}// End of Import data :================================================================================================================
+
+
+
+
+// Export data :========================================================================================================================
+global proc Export_data()
+{
+
+	select -r "IK_TO_FK_Limbs";
+	ExportSelectionOptions;
+	checkBoxGrp -e -enable off -v1 off exInHistoryBox;
+	checkBoxGrp -e -enable off -v1 off exInChannelsBox;
+	checkBoxGrp -e -enable off -v1 off exInExpressionsBox;
+	checkBoxGrp -e -enable off -v1 off exInConstraintsBox;
+	fileOptionsSaveAndClose OptionBoxWindow "ExportActive";
+	ExportSelection;
+
+}// End of Export data :================================================================================================================
+
+
+
+
+// Remove Namespace:-----------------------------------------------------------------------------------------------------------
+global proc string IK_FK_Remove_nameSpace(string $name)
+{
+    string $spliters[];
+    tokenize  $name ":" $spliters; // Remove namespace:
+    $name = $spliters[size($spliters)-1];
+    //print $name;
+    return $name;
+}// Remove Namespace (End):-----------------------------------------------------------------------------------------------------
+
+
+
+
+print "\n IK - FK Match for Maya   |   Version: 2.33.0    \n";
